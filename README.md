@@ -3,8 +3,10 @@
 ## Concept
 
 This browser extension takes the information publicly available on [Justel](https://www.ejustice.just.fgov.be/loi/loi.htm), the Belgian database of consolidated legislation, and displays it in a much more user-friendly experience.
+
 ![Screenshot 1](doc/screenshot1.png)
-![Screenshot 2](doc/screenshot1.png)
+
+![Screenshot 2](doc/screenshot2.png)
 
 ## Features
 
