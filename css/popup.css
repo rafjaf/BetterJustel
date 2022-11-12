@@ -1,0 +1,24 @@
+body {
+  width: 30rem;
+  font-size: 100%;
+}
+h1 {
+	text-align: center;
+}
+table {
+	border-collapse: collapse;
+	width: 100%;
+	table-layout: fixed;
+}
+thead tr {
+	background: #00cccc; 
+	color: white;
+}
+thead th:nth-child(1) {width: 20%;}
+tbody td:nth-child(2) {overflow: auto;}
+table, tr, th, td {
+	border: 2px solid #CCC; 
+	padding: 5px;
+}
+tbody tr:nth-child(even) {background-color: #f2f2f2;}
+td b {color: blue}

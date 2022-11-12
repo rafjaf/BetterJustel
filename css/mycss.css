@@ -1,0 +1,315 @@
+body {
+	background-image: url("chrome-extension://__MSG_@@extension_id__/images/fond5.jpg");
+	font-variant: normal;
+	font-size: medium;
+	font-family: Times;
+}
+
+body > table {display: none;}
+
+div#loading {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	justify-content: center;
+	align-items: center;
+}
+
+@keyframes ldio-zrg2ss6p6ee {
+  0% { opacity: 1 }
+  100% { opacity: 0 }
+}
+.ldio-zrg2ss6p6ee div {
+  left: 94px;
+  top: 48px;
+  position: absolute;
+  animation: ldio-zrg2ss6p6ee linear 1s infinite;
+  background: #1d3f72;
+  width: 12px;
+  height: 24px;
+  border-radius: 6px / 12px;
+  transform-origin: 6px 52px;
+}.ldio-zrg2ss6p6ee div:nth-child(1) {
+  transform: rotate(0deg);
+  animation-delay: -0.9166666666666666s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(2) {
+  transform: rotate(30deg);
+  animation-delay: -0.8333333333333334s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(3) {
+  transform: rotate(60deg);
+  animation-delay: -0.75s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(4) {
+  transform: rotate(90deg);
+  animation-delay: -0.6666666666666666s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(5) {
+  transform: rotate(120deg);
+  animation-delay: -0.5833333333333334s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(6) {
+  transform: rotate(150deg);
+  animation-delay: -0.5s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(7) {
+  transform: rotate(180deg);
+  animation-delay: -0.4166666666666667s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(8) {
+  transform: rotate(210deg);
+  animation-delay: -0.3333333333333333s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(9) {
+  transform: rotate(240deg);
+  animation-delay: -0.25s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(10) {
+  transform: rotate(270deg);
+  animation-delay: -0.16666666666666666s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(11) {
+  transform: rotate(300deg);
+  animation-delay: -0.08333333333333333s;
+  background: #1d3f72;
+}.ldio-zrg2ss6p6ee div:nth-child(12) {
+  transform: rotate(330deg);
+  animation-delay: 0s;
+  background: #1d3f72;
+}
+.loadingio-spinner-spinner-is7uuvdj549 {
+  width: 200px;
+  height: 200px;
+  display: inline-block;
+  overflow: hidden;
+  background: none;
+}
+.ldio-zrg2ss6p6ee {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform: translateZ(0) scale(1);
+  backface-visibility: hidden;
+  transform-origin: 0 0; /* see note above */
+}
+.ldio-zrg2ss6p6ee div { box-sizing: content-box; }
+
+div#main {
+	display: flex;
+	flex-direction: column;
+	width: 99%;
+	height: 99%;
+	position: absolute;
+}
+
+div#info, div#toc, div#content {
+	overflow: scroll;
+}
+
+div#info {
+	position: relative;
+	flex: 0 0 auto;
+	padding-left: 10px;
+	width: 100%;
+	height: 150px;
+}
+
+div#info div#addinfodiv {
+	margin-top: 10px;
+}
+
+div#info span {
+	margin-left: 20px;
+}
+
+div#info a {
+	cursor: pointer;
+}
+
+div#info a#btnSavePDF {
+	position: relative;
+	margin-left: 10px;
+	top: 4px;
+}
+
+div#hsplit {
+	flex: 0 0 auto;
+	border-bottom: groove;
+	cursor: row-resize;
+	height: 10px;
+}
+
+div#maincontent {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: row;
+	overflow: hidden;
+}
+
+div#toc {
+	position: relative;
+	flex: 0 0 auto;
+	padding-top: 20px;
+	width: 30%;
+	height: 100%;
+}
+div#toc div#btndiv {
+	margin-bottom: 10px;
+}
+div#toc button {
+	margin-left: 20px;
+}
+div#toc div#btndiv span {
+	padding-left: 20px; 
+	font-weight: bold;
+}
+div#toc div#btndiv span.true {
+	color: red; 
+}
+
+div#toc div#btndiv span.false {
+	color: blue; 
+}
+
+div#vsplit {
+	position: relative;
+	flex: 0 0 auto;
+	width: 1px;
+	height: auto;
+	border-right: groove;
+	cursor: col-resize;
+	width: 10px;
+}
+
+div#content {
+	position: relative;
+	flex: 1 1 auto;
+	padding-top: 20px;
+	padding-left: 2%;
+	width: 67%;
+	height: 100%;
+}
+
+div#content div.level1 {
+	font-size: 24px;
+	color: blue;
+	font-weight: bold;
+}
+
+div#content div.level2 {
+	font-size: 22px;
+	color: red;
+	font-weight: bold;
+	margin-left: 20px;
+}
+
+div#content div.level3 {
+	font-size: 20px;
+	color: green;
+	font-weight: bold;
+	margin-left: 40px;
+}
+
+div#content div.level4 {
+	font-size: 18px;
+	color: cornflowerblue;
+	font-weight: bold;
+	margin-left: 60px;
+}
+
+div#content div.level5 {
+	font-size: 16px;
+	color: orange;
+	font-weight: bold;
+	margin-left: 80px;
+}
+
+div#content div.level6 {
+	font-size: 16px;
+	color: darkcyan;
+	font-weight: bold;
+	margin-left: 100px;
+}
+
+div#content div.level7 {
+	font-size: 16px;
+	color: deeppink;
+	font-weight: bold;
+	margin-left: 120px;
+}
+
+div#content div.article div {
+	margin-top: 9px;
+}
+
+div#content div.nostyle {
+	font-size: initial;
+	color: black;
+	font-weight: normal;
+	margin-left: 0px;
+}
+
+div#toolbar {
+	border: 1px solid grey;
+	width: 195px;
+	height: 26px;
+	padding: 5px;
+	position: absolute;
+	background: white;
+}
+
+div.circle {
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 2px solid grey;
+	margin-left: 7px;
+	float: left;
+	cursor: pointer;
+}
+
+annotation {
+	border: 1px solid grey;
+	width: 195px;
+	height: 100px;
+	padding: 5px;
+	font-size: small;
+	position: absolute;
+}
+
+.yellow {
+	background: #ffee58;
+}
+
+.green {
+	background: lightgreen;
+}
+
+.blue {
+	background: lightskyblue;
+}
+
+.red {
+	background: tomato;
+}
+
+.violet {
+	text-decoration: underline;
+	text-decoration-color: mediumpurple;
+	text-decoration-thickness: 2pt;
+	text-decoration-skip-ink: none;
+}
+
+.circle.violet, annotation.violet {
+	background: mediumpurple;
+}
+
+.annotated {
+	font-style: italic;
+}
+
+highlight {
+	cursor: pointer;
+}
