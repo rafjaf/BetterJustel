@@ -3,6 +3,8 @@
 ## Concept
 
 This browser extension takes the information publicly available on [Justel](https://www.ejustice.just.fgov.be/loi/loi.htm), the Belgian database of consolidated legislation, and displays it in a much more user-friendly experience.
+![Screenshot 1](doc/screenshot1.png)
+![Screenshot 2](doc/screenshot1.png)
 
 ## Features
 
@@ -33,7 +35,7 @@ This extension was inspired by the very thorough userscript written by Naja Mela
 
 It makes use of the following open source libraries :
 
-- dom-anchor-text-position 5.0.0 &lt;https://www.npmjs.com/package/dom-anchor-text-position&gt; and dom-anchor-text-quote 4.0.2 &lt;https://www.npmjs.com/package/dom-anchor-text-quote&gt;, packaged judell &lt;https://github.com/judell/TextQuoteAndPosition&gt;
+- dom-anchor-text-position 5.0.0 &lt;https://www.npmjs.com/package/dom-anchor-text-position&gt; and dom-anchor-text-quote 4.0.2 &lt;https://www.npmjs.com/package/dom-anchor-text-quote&gt;, packaged by judell &lt;https://github.com/judell/TextQuoteAndPosition&gt;
 - download.js 4.2 &lt;https://github.com/rndme/download&gt;
 - Dropbox SDK &lt;https://github.com/dropbox/dropbox-sdk-js&gt;
 - jquery 3.6.1 &lt;https://jquery.com/&gt;
