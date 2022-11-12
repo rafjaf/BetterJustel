@@ -34,8 +34,8 @@ This extension was inspired by the very thorough userscript written by Naja Mela
 It makes use of the following open source libraries :
 
 - dom-anchor-text-position 5.0.0 &lt;https://www.npmjs.com/package/dom-anchor-text-position&gt; and dom-anchor-text-quote 4.0.2 &lt;https://www.npmjs.com/package/dom-anchor-text-quote&gt;, packaged judell &lt;https://github.com/judell/TextQuoteAndPosition&gt;
-- download.js 4.2 <https://github.com/rndme/download>
-- Dropbox SDK <https://github.com/dropbox/dropbox-sdk-js>
-- jquery 3.6.1 <https://jquery.com/>
-- jquery resizable plugin 0.35 <https://github.com/RickStrahl/jquery-resizable>
-- jsTree 3.3.12 <https://www.jstree.com/>
+- download.js 4.2 &lt;https://github.com/rndme/download&gt;
+- Dropbox SDK &lt;https://github.com/dropbox/dropbox-sdk-js&gt;
+- jquery 3.6.1 &lt;https://jquery.com/&gt;
+- jquery resizable plugin 0.35 &lt;https://github.com/RickStrahl/jquery-resizable&gt;
+- jsTree 3.3.12 &lt;https://www.jstree.com/&gt;
