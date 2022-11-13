@@ -90,4 +90,6 @@ document.querySelector("a#importHighlights").addEventListener("click", importHig
 document.querySelector("a#toggleDropboxBackup").addEventListener("click", toggleDropboxBackup);
 document.querySelector("a#exportAllHighlights").addEventListener("click", exportAllHighlights);
 
+document.querySelector("span#version").innerText = chrome.runtime.getManifest().version;
+
 populateListOfStoredActs();
