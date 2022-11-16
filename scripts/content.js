@@ -353,9 +353,19 @@
 			return
 		}
 		act.eli = document.querySelectorAll("body > table")[0].querySelector("tbody > tr:nth-child(9) > td")?.textContent?.replace("http:", "https:");
+		if (!act.eli) {act.eli = window.location.href.replace("http:", "https:");}
 		// Act type, date and title
 		act.type = act.eli.split("/")[4];
+		debugger;
+		if (act.type.indexOf("loi_a1.pl") > -1) {act.type = "traité";}
 		act.date = act.eli.split("/").slice(5,8).join("-");
+		if (!act.date) {
+			const MONTH_FR = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout",
+							  "septembre", "octobre", "novembre", "decembre"];
+			let text = document.querySelectorAll("body > table")[1].querySelector("th b").innerText.toLowerCase();
+			let components = text.match(/^(\d+)+\s(\w+)\s(\d+)/);
+			act.date = components[3] + "-" + (MONTH_FR.indexOf(components[2]) + 1).toString().padStart(2, "0") + "-" + components[1];
+		}
 		act.title = titleTable.querySelector("tbody > tr:nth-child(3) > th > b")
 			.firstChild.textContent.replace(/\(.+/, "")
 			.split("-").slice(1).join("-").trim().split(" ");
@@ -418,7 +428,7 @@
 			}
 		}
 		additionalInfo.push(`<a href='${act.eli}' target="_blank">ELI</a>`);
-		additionalInfo.push(`<a id='clearDB' href='#'>Clear DB</a>`);
+		additionalInfo.push(`<a id='clearDB' href='#'>Clear storage</a>`);
 		additionalInfo.push(`<a href="${window.location.origin + window.location.pathname}`
 							+`${window.location.search ? window.location.search + "&" : "?"}noJS=true" target="_blank">Disable extension</a></b>`);
 		act.info += "<br><div id='addinfodiv'>" + additionalInfo.map(el => `<span style='font-weight: bold;'>${el}</span>`).join("") + "</div>";
@@ -689,6 +699,7 @@
 			updateInfo[act.eli] =
 				{
 				act: act.lastUpdate,
+				date: act.date,
 				fullTitle: act.fullTitle,
 				script: chrome.runtime.getManifest().version,
 			};
@@ -738,7 +749,8 @@
 		// Identify act
 		await analyseFirstInfo();
 		// If URL is not ELI, redirect to ELI
-		if ( (window.location.origin + window.location.pathname) != act.eli) {
+		if ( ((window.location.origin + window.location.pathname) != act.eli)
+			 && (act.eli.indexOf("cgi_loi") == -1) ) {
 			window.location.href = act.eli;
 			return;
 		}

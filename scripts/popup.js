@@ -59,30 +59,39 @@ async function exportAllHighlights() {
 }
 
 async function populateListOfStoredActs() {
+	async function clearStorage (event) {
+		let eli = event.target.parentElement.parentElement.parentElement.children[1].children[0].href;
+		let listOfActs = await getStorage("updateInfo");
+		delete listOfActs[eli];
+		await setStorage("updateInfo", listOfActs);
+		event.target.parentElement.parentElement.parentElement.remove();
+	}
 	// Get list of stored acts
 	let listOfActs = await getStorage("updateInfo");
 	// Exit if no store acts
 	if (!listOfActs) {return;}
 	// Turn it into an array
-	let arrayOfActs = [], recordChanges = false;
+	let arrayOfActs = [];
 	for (const key in listOfActs) {
 		let act = listOfActs[key];
 		act.eli = key;
-		act.sortCriterion = key.split("/").slice(5).join("");
-		act.date = key.split("/").slice(5, 8).join("-");
-		act.number = key.split("/").slice(8,9);
+		// act.sortCriterion = key.split("/").slice(5).join("");
+		// act.date = key.split("/").slice(5, 8).join("-");
+		// act.number = key.split("/").slice(8,9);
 		arrayOfActs.push(act);
 	}
 	// Sort array by act date
-	arrayOfActs = arrayOfActs.sort((a, b) => a.sortCriterion.localeCompare(b.sortCriterion));
+	// arrayOfActs = arrayOfActs.sort((a, b) => a.sortCriterion.localeCompare(b.sortCriterion));
+	arrayOfActs = arrayOfActs.sort((a, b) => a.date?.localeCompare(b.date));
 	// Build a table of acts
-	let table = "<table><thead><tr><th>Date</th><th>Title</th></tr></thead><tbody>";
+	let table = "<table><thead><tr><th>Date</th><th>Title</th><th>Clear</th></tr></thead><tbody>";
 	arrayOfActs.forEach(el => {
-		table += `<tr><td>${el.date}</td><td><a href="${el.eli}" target="_blank">${el.fullTitle ? el.fullTitle : el.number}</a></td></tr>`;
+		table += `<tr><td>${el.date}</td><td><a href="${el.eli}" target="_blank">${el.fullTitle ? el.fullTitle : el.number}</a></td><td><a class="clear" href="#"><img src="${chrome.runtime.getURL("images/trash.png")}"></a></td></tr>`;
 	});
 	table += "</tbody></table>";
 	// Display table
 	document.querySelector("div#storedActs").innerHTML = table;
+	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", clearStorage));
 }
 
 // Main
@@ -93,3 +102,4 @@ document.querySelector("a#exportAllHighlights").addEventListener("click", export
 document.querySelector("span#version").innerText = chrome.runtime.getManifest().version;
 
 populateListOfStoredActs();
+
