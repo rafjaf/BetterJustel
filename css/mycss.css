@@ -187,7 +187,7 @@ div#content {
 	position: relative;
 	flex: 1 1 auto;
 	padding-top: 20px;
-	padding-left: 2%;
+	padding-left: 35px;
 	width: 67%;
 	height: 100%;
 }
@@ -312,4 +312,11 @@ annotation {
 
 highlight {
 	cursor: pointer;
+}
+
+span.subpar {
+	position: absolute;
+	margin-left: -30px;
+	margin-top: 5px;
+	font-size: x-small;
 }

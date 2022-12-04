@@ -133,15 +133,16 @@
 			if (n.type == "article") {
 				const INDENT_TYPE = [/^(?:<b>.+<\/b>)?(?:\[(<sup>.+<\/sup>)?\s?)?§\s\d+(er)?(\/\d+)?\./, /^(?:\[(<sup>.+<\/sup>)?\s?|\()?\d+°(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?/,
 									 /^(?:\[(<sup>.+<\/sup>)?\s?)?\(?\w\)/, /^(?:\[(<sup>.+<\/sup>)?\s?)?[ivx]+\.\s/, /^(?:\[(<sup>.+<\/sup>)?\s?)?-\s/];
-				let content = n.content.split("<br>").map(el => el.trim().replace(/\s\s/g, " "));
+				let content = n.content.split("<br>").filter(el => el).map(el => el.trim().replace(/\s\s/g, " "));
 				let contentIndent = new Array(content.length);
 				// For article's indent the logic is as follows:
-				// 1. Loop forward and give to each title starting with 1°, a), etc. its proper indent;
-				//    any title without unindentified ident is marked with type -1
-				// 2. Loop backward and assume that any paragraph of unidentified type -1 is of the same type as the last one;
+				// 1. Loop forwards and give to each text block starting with 1°, a), etc. its proper indent;
+				//    any text block with unindentified ident is marked with type -1
+				// 2. Loop backwards and assume that any paragraph of unidentified type -1 is of the same type as the last one;
 				//    that way, a paragraph can continue for several sub-paragraphs. However, this does not apply for the paragraph
 				//    preceding the first of a series (thus preceding 1°, a), etc.) which is marked -2
 				// 3. Loop again forwards and assume that paragraphs -2 are of the same type as the preceding paragraph
+				// First loop:
 				for (let i = 0; i < content.length; i++) {
 					// Put "Art." and its title in bold
 					let m = content[i].match(ARTICLE_REGEX);
@@ -157,6 +158,7 @@
 						content[i] = content[i].replace(INDENT_TYPE[t], "<b>$&</b>");
 					}
 				}
+				// Second loop:
 				let indent = 0;
 				for (let i = content.length - 1; i > 0; i--) {
 					if (contentIndent[i].type == -1) {
@@ -172,16 +174,28 @@
 						}
 					}
 				}
+				// Third loop:
+				let subparCount = 0;
 				indent = 0;
 				for (let i = 0; i < content.length; i++) {
 					if (contentIndent[i].type == -2) {
-						contentIndent[i].type = indent
+						contentIndent[i].type = Math.max(indent, 0);
 					}
 					else {
 						indent = contentIndent[i].type
 					}
+					if (content[i].startsWith("----------")) {
+						subparCount = undefined;
+					}
+					else if (contentIndent[i].numbering?.match(/§/)) {
+						subparCount = 1
+					}
+					else if (contentIndent[i].type == 0 || (!i && !content[i].endsWith("</b>")) ) {
+						subparCount += 1;
+						contentIndent[i].subparCount = subparCount;
+					}
 				}
-				n.content = content.map((el, i) => `<div style='padding-left: ${contentIndent[i].type * 20}px;'>${el}</div>`).join("") + "<br>";
+				n.content = content.map((el, i) => `<div style='padding-left: ${contentIndent[i].type * 20}px;'>${contentIndent[i].subparCount > 1 ? "<span class='subpar'>Al. " + contentIndent[i].subparCount + "</span>" : ""}${el}</div>`).join("") + "<br>";
 			}
 			else if (n.titleOngoing) {
 				// This is a heading whose title is ongoing, needs to be closed

@@ -75,13 +75,9 @@ async function populateListOfStoredActs() {
 	for (const key in listOfActs) {
 		let act = listOfActs[key];
 		act.eli = key;
-		// act.sortCriterion = key.split("/").slice(5).join("");
-		// act.date = key.split("/").slice(5, 8).join("-");
-		// act.number = key.split("/").slice(8,9);
 		arrayOfActs.push(act);
 	}
 	// Sort array by act date
-	// arrayOfActs = arrayOfActs.sort((a, b) => a.sortCriterion.localeCompare(b.sortCriterion));
 	arrayOfActs = arrayOfActs.sort((a, b) => a.date?.localeCompare(b.date));
 	// Build a table of acts
 	let table = "<table><thead><tr><th>Date</th><th>Title</th><th>Clear</th></tr></thead><tbody>";
