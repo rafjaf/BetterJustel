@@ -5,6 +5,20 @@ body {
 h1 {
 	text-align: center;
 }
+form {
+	position: relative;
+}
+input#search {
+	margin-bottom: 15px;
+	width: 98%;
+}
+a#clearSearch {
+	position: absolute;
+	top: 0px;
+	right: 10px;
+	color: gray;
+	cursor: pointer;
+}
 table {
 	border-collapse: collapse;
 	width: 100%;

@@ -80,14 +80,45 @@ async function populateListOfStoredActs() {
 	// Sort array by act date
 	arrayOfActs = arrayOfActs.sort((a, b) => a.date?.localeCompare(b.date));
 	// Build a table of acts
-	let table = "<table><thead><tr><th>Date</th><th>Title</th><th>Clear</th></tr></thead><tbody>";
+	let table = "<form autocomplete='false'><input id='search' placeholder='Type text to filter acts' autocomplete='false'><a id='clearSearch' style='display: none;'>x</a></form>"
+				+"<table><thead><tr><th>Date</th><th>Title</th><th>Clear</th></tr></thead><tbody>";
 	arrayOfActs.forEach(el => {
 		table += `<tr><td>${el.date}</td><td><a href="${el.eli}" target="_blank">${el.fullTitle ? el.fullTitle : el.number}</a></td><td><a class="clear" href="#"><img src="${chrome.runtime.getURL("images/trash.png")}"></a></td></tr>`;
 	});
 	table += "</tbody></table>";
 	// Display table
+	document.querySelector("div#noStoredActs").style.display = "none";
 	document.querySelector("div#storedActs").innerHTML = table;
 	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", clearStorage));
+	document.querySelector("input#search").addEventListener("input", searchChange);
+	document.querySelector("a#clearSearch").addEventListener("click", () => {
+		document.querySelector("input#search").value = "";
+		searchChange();
+	});
+}
+
+function searchChange(e) {
+	// Search for each term separated by a spac"
+	document.querySelector("a#clearSearch").style.display = document.querySelector("input#search").value ? "block" : "none";
+	let somethingFound = false;
+	document.querySelectorAll("tbody > tr").forEach(tr => {
+		let act = tr.querySelector("a").text.toLowerCase();
+		if (!document.querySelector("input#search").value || document.querySelector("input#search").value.split(" ").every(el => act.indexOf(el.toLowerCase()) >= 0)) {
+			somethingFound = true;
+			tr.style.display = "table-row";
+		}
+		else {
+			tr.style.display = "none";
+		}
+	});
+	if (somethingFound) {
+		document.querySelector("thead > tr").style.display = "table-row";
+		document.querySelector("div#noStoredActs").style.display = "none";
+	}
+	else {
+		document.querySelector("thead > tr").style.display = "none";
+		document.querySelector("div#noStoredActs").style.display = "block";
+	}
 }
 
 // Main
