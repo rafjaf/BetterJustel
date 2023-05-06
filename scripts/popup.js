@@ -80,7 +80,7 @@ async function populateListOfStoredActs() {
 	// Sort array by act date
 	arrayOfActs = arrayOfActs.sort((a, b) => a.date?.localeCompare(b.date));
 	// Build a table of acts
-	let table = "<form autocomplete='off'><input id='search' placeholder='Type text to filter acts' autocomplete='off'><a id='clearSearch' style='display: none;'>x</a></form>"
+	let table = "<form autocomplete='off'><input id='search' placeholder='Type text to filter acts' autocomplete='off' autofocus><a id='clearSearch' style='display: none;'>x</a></form>"
 				+"<table><thead><tr><th>Date</th><th>Title</th><th>Clear</th></tr></thead><tbody>";
 	arrayOfActs.forEach(el => {
 		table += `<tr><td>${el.date}</td><td><a href="${el.eli}" target="_blank">${el.fullTitle ? el.fullTitle : el.number}</a></td><td><a class="clear" href="#"><img src="${chrome.runtime.getURL("images/trash.png")}"></a></td></tr>`;
