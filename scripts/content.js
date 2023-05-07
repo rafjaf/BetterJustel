@@ -690,7 +690,7 @@
 
 	// Hide table in order to accelerate dramatically loading of the DOM
 	function processResultsPage() {
-		if (document.querySelectorAll("frame")[1].contentDocument.querySelector("frame")) {
+		if (document.querySelectorAll("frame")[1]?.contentDocument?.querySelector("frame")) {
 			var forms = document.querySelectorAll("frame")[1].contentDocument.querySelector("frame").contentDocument.querySelectorAll("table form");
 			for (var i = 0; i < forms.length; i++) {
 				// En changeant la cible, on fait en sorte que chaque lien s'ouvre dans une nouvelle fenêtre
