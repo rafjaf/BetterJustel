@@ -35,6 +35,7 @@ async function toggleDropboxBackup() {
 		if (choice) {
 			highlightsBackup = {};
 			await setStorage("highlightsBackup", highlightsBackup);
+			document.querySelector("a#toggleDropboxBackup").innerText = "Enable Dropbox backup of highlights";
 		}
 	}
 	else {
@@ -60,11 +61,19 @@ async function exportAllHighlights() {
 
 async function populateListOfStoredActs() {
 	async function clearStorage (event) {
-		let eli = event.target.parentElement.parentElement.parentElement.children[1].children[0].href;
-		let listOfActs = await getStorage("updateInfo");
-		delete listOfActs[eli];
-		await setStorage("updateInfo", listOfActs);
-		event.target.parentElement.parentElement.parentElement.remove();
+		let act = event.target.parentElement.parentElement.parentElement.children[1].children[0];
+		let proceed = confirm("Press OK to remove from the offline database, including all highlights, " + act.innerText);
+		if (proceed) {
+			let eli = act.href;
+			// Clear text content in database
+			let listOfActs = await getStorage("updateInfo");
+			delete listOfActs[eli];
+			await setStorage("updateInfo", listOfActs);
+			// Clear highlights in database
+			await setStorage("highlights-" + eli, "");
+			// Remove from popup list of acts
+			event.target.parentElement.parentElement.parentElement.remove();
+		}
 	}
 	// Get list of stored acts
 	let listOfActs = await getStorage("updateInfo");
@@ -122,6 +131,12 @@ function searchChange(e) {
 }
 
 // Main
+let highlightsBackup = await getStorage("highlightsBackup") || {};
+if (highlightsBackup.accessToken) {
+	document.querySelector("a#toggleDropboxBackup").innerText = "Disable Dropbox backup of highlights";
+}
+
+
 document.querySelector("a#importHighlights").addEventListener("click", importHighlights);
 document.querySelector("a#toggleDropboxBackup").addEventListener("click", toggleDropboxBackup);
 document.querySelector("a#exportAllHighlights").addEventListener("click", exportAllHighlights);
