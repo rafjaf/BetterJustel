@@ -2,7 +2,9 @@
 
 ## Concept
 
-This browser extension (for the time being available only for [Chrome](https://chrome.google.com/webstore/detail/better-justel/jjknlnihcjeefjgdacaanbiedamibimp)) takes the information publicly available on [Justel](https://www.ejustice.just.fgov.be/loi/loi.htm), the Belgian database of consolidated legislation, and displays it in a more user-friendly experience.
+This browser extension (available for [Chrome](https://chrome.google.com/webstore/detail/better-justel/jjknlnihcjeefjgdacaanbiedamibimp) and [Firefox](https://addons.mozilla.org/fr/firefox/addon/better-justel/)) takes the information publicly available on [Justel](https://www.ejustice.just.fgov.be/loi/loi.htm), the Belgian database of consolidated legislation, and displays it in a more user-friendly experience.
+
+IMPORTANCE NOTICE: If you are using the Firefox extension, the first time you will surf to Justel website, a blue dot will appear on the icon of the extension. You must right-click on the extension icon and grant it permission to always run on www.ejustice.fgov.be. Otherwise, the extension will not work.
 
 ![Screenshot 1](doc/screenshot1.png)
 
