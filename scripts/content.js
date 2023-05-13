@@ -234,6 +234,7 @@
 		while ( WRONG_LAST_NODENAME.some(el => el == contentNodes.slice(-1)[0].nodeName) ) {
 			contentNodes = contentNodes.concat( Array.from( contentNodes.slice(-1)[0].childNodes ) );
 		}
+		// Anlyse each node depending on their type
 		for (let n of contentNodes) {
 			if ( (n.nodeName == "A") && (n.name) && (n.name.startsWith("LNK") && !(n.textContent.toLowerCase().startsWith("annexe")) ) ) {
 				// This is a heading
@@ -343,7 +344,15 @@
 				}
 			}
 		}
-		if (lastNode) {beautify(lastNode);}
+		if (lastNode) {
+			beautify(lastNode);
+			if ( (lastNode.type == "article") && (lastNode.text == "Art.") ) {
+				let correctText = lastNode.content.match(/(<div style='padding-left: -20px;'><b>)(.+)(<\/b>)/)?.[2];
+				if (correctText) {
+					lastNode.text = correctText;
+				}
+			}
+		}
 	}
 
 	function buildContent(nodesArray) {
@@ -559,7 +568,7 @@
 		document.querySelector("head > title").text = act.fullTitle;
 		// Set up highlighter
 		$("div#content").on( "mouseup", manageHighlights );
-		$("div#content").append("<div id='toolbar'><div class='circle yellow'></div><div class='circle green'></div><div class='circle blue'></div>"
+		$("div#content").append("<div id='toolbar' style='display: none;'><div class='circle yellow'></div><div class='circle green'></div><div class='circle blue'></div>"
 								+"<div class='circle red'></div><div class='circle violet'></div><div class='circle'></div></div>");
 		await runDropboxBackup();
 	}
@@ -818,7 +827,7 @@
 			if (highlightsBackup?.redirect) { window.location.href = highlightsBackup.redirect; }
 		}
 	}
-	else if (window.location.protocol == "chrome-extension:") {
+	else if ( (window.location.protocol == "chrome-extension:") || (window.location.protocol == "moz-extension:") ) { 
 		let u = new URLSearchParams(window.location.search);
 		let eli = u.get("eli");
 		if (!eli) {

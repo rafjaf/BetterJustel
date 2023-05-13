@@ -77,7 +77,7 @@ async function populateListOfStoredActs() {
 	}
 	// Get list of stored acts
 	let listOfActs = await getStorage("updateInfo");
-	// Exit if no store acts
+	// Exit if no stored acts
 	if (!listOfActs) {return;}
 	// Turn it into an array
 	let arrayOfActs = [];
@@ -107,7 +107,7 @@ async function populateListOfStoredActs() {
 }
 
 function searchChange(e) {
-	// Search for each term separated by a spac"
+	// Search for each term separated by a space
 	document.querySelector("a#clearSearch").style.display = document.querySelector("input#search").value ? "block" : "none";
 	let somethingFound = false;
 	document.querySelectorAll("tbody > tr").forEach(tr => {
