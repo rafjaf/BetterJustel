@@ -49,3 +49,4 @@ It makes use of the following open source libraries :
 - Version 0.1.2022.1204 : added auto-numbering of subparagraphs (alinéas).
 - Version 0.1.2023.0506 : added autofocus to search input box in popup window
 - Version 0.1.2023.0507 : clear button in popup window also deletes highlights; confirmation added before clearing; change toggle Dropbox to enable/disable Dropbox; added overflow to annotations
+- Version 0.1.2023.0513 : added compatibility to Firefox

@@ -8,7 +8,7 @@
 	let act = {content: []}, updateInfo, highlights, currentArticle, currentRange, highlightsBackup;
 	let headingsWhoseTypeNeedsToBeDefined = [];
 	
-	let {getStorage, setStorage, getAllHighlights} = await import('./util.js');
+	let {getStorage, setStorage, getAllHighlights} = await import(chrome.runtime.getURL('scripts/util.js'));
 
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -370,7 +370,6 @@
 		if (!act.eli) {act.eli = window.location.href.replace("http:", "https:");}
 		// Act type, date and title
 		act.type = act.eli.split("/")[4];
-		debugger;
 		if (act.type.indexOf("loi_a1.pl") > -1) {act.type = "traité";}
 		act.date = act.eli.split("/").slice(5,8).join("-");
 		if (!act.date) {

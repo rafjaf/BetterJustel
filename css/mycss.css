@@ -1,5 +1,19 @@
+@supports(-webkit-user-select: none ) {
+	:root { 		
+		--url_fond: url("chrome-extension://__MSG_@@extension_id__/images/fond5.jpg"); 	
+	} 
+}  
+
+@supports(-moz-user-select: none ) { 	
+	:root { 		
+		--url_fond: url("moz-extension://__MSG_@@extension_id__/images/fond5.jpg"); 	
+	} 
+}
+
+
+
 body {
-	background-image: url("chrome-extension://__MSG_@@extension_id__/images/fond5.jpg");
+	background-image: var(--url_fond);
 	font-variant: normal;
 	font-size: medium;
 	font-family: Times;
