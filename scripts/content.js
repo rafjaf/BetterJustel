@@ -131,16 +131,22 @@
 			if (m) { n.text = m[0]; }
 			// Rules depending on node type
 			if (n.type == "article") {
-				const INDENT_TYPE = [/^(?:<b>.+<\/b>)?(?:\[(<sup>.+<\/sup>)?\s?)?§\s\d+(er)?(\/\d+)?\./, /^(?:\[(<sup>.+<\/sup>)?\s?|\()?\d+°(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?/,
-									 /^(?:\[(<sup>.+<\/sup>)?\s?)?\(?\w\)/, /^(?:\[(<sup>.+<\/sup>)?\s?)?[ivx]+\.\s/, /^(?:\[(<sup>.+<\/sup>)?\s?)?-\s/];
+				const INDENT_PREFIX = "^(?:<b>.+<\\/b>)?(?:\\[(<sup>.+<\\/sup>)?\\s?|\\()?";
+				const INDENT_ARRAY = ["§\\s\\d+(er)?(\\/\\d+)?\.", 
+									  "[IVX]+\\.\\s",
+									  "\\d+°(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?",
+									  "\\(?\\w\\)",
+									  "[ivx]+\\.\\s",
+									  "-\\s"];
+				const INDENT_TYPE = INDENT_ARRAY.map(el => new RegExp(INDENT_PREFIX + el));
 				let content = n.content.split("<br>").filter(el => el).map(el => el.trim().replace(/\s\s/g, " "));
 				let contentIndent = new Array(content.length);
 				// For article's indent the logic is as follows:
-				// 1. Loop forwards and give to each text block starting with 1°, a), etc. its proper indent;
-				//    any text block with unindentified ident is marked with type -1
+				// 1. Loop forwards and give to each text block starting with I., 1°, a), etc. its proper indent;
+				//    any text block with unindentified indent is marked with type -1
 				// 2. Loop backwards and assume that any paragraph of unidentified type -1 is of the same type as the last one;
 				//    that way, a paragraph can continue for several sub-paragraphs. However, this does not apply for the paragraph
-				//    preceding the first of a series (thus preceding 1°, a), etc.) which is marked -2
+				//    preceding the first of a series (thus preceding I., 1°, a), etc.) which is marked -2
 				// 3. Loop again forwards and assume that paragraphs -2 are of the same type as the preceding paragraph
 				// First loop:
 				for (let i = 0; i < content.length; i++) {

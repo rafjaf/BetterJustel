@@ -53,3 +53,4 @@ It makes use of the following open source libraries :
 - Version 0.1.2023.0507 : clear button in popup window also deletes highlights; confirmation added before clearing; change toggle Dropbox to enable/disable Dropbox; added overflow to annotations
 - Version 0.1.2023.0513 : added compatibility to Firefox
 - Version 0.1.2023.0514 : visibility of subparagraphs (alinéas) numbering only visible when hovering with the mouse over the relevant article; display in the toc the number of last article even though it is not properly encoded in the HTML
+- Version 0.1.2023.0530 : improves indent of articles (includes numbering starting with I., II., etc.)
