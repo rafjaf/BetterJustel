@@ -134,7 +134,7 @@
 				const INDENT_PREFIX = "^(?:<b>.+<\\/b>)?(?:\\[(<sup>.+<\\/sup>)?\\s?|\\()?";
 				const INDENT_ARRAY = ["§\\s\\d+(er)?(\\/\\d+)?\.", 
 									  "[IVX]+\\.\\s",
-									  "\\d+°(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?",
+									  "\\d+(\\/\\d+)?°(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?",
 									  "\\(?\\w\\)",
 									  "[ivx]+\\.\\s",
 									  "-\\s"];
