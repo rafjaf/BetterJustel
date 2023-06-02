@@ -135,8 +135,8 @@
 				const INDENT_ARRAY = ["§\\s\\d+(er)?(\\/\\d+)?\.", 
 									  "[IVX]+\\.\\s",
 									  "\\d+(\\/\\d+)?°(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?",
-									  "\\(?\\w\\)",
-									  "[ivx]+\\.\\s",
+									  "\\(?[a-hj-uwyz]\\)",
+									  "[ivx]+(\\.|\\))\\s",
 									  "-\\s"];
 				const INDENT_TYPE = INDENT_ARRAY.map(el => new RegExp(INDENT_PREFIX + el));
 				let content = n.content.split("<br>").filter(el => el).map(el => el.trim().replace(/\s\s/g, " "));
