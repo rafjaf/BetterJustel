@@ -473,7 +473,7 @@
 			let changesMade = false;
 			for (let key in highlights.quotes) {
 				let article = $(`div#toc a:contains("${key}")`)?.[0]?.id;
-				if (!article) {
+				if (!key || !article) {
 					console.info(`Loaded page does not contain anymore "${key}" article, deleting highlight from database`);
 					delete highlights.quotes[key];
 					changesMade = true;
