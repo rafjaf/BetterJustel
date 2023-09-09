@@ -586,6 +586,11 @@
 			let i = highlights.quotes[articleText].findIndex(el => el.id == h.id);
 			return [currentArticle, articleText, i];
 		}
+		function linkifyUrls(text) {
+			const urlRegex = /(?:(?:https?|ftp):\/\/|www\.)[^\s/$.?#].[^\s]*[^\s.,\])]/gi;
+			return text.replace(urlRegex, url => `<a href="${url}">${url}</a>`);
+
+		}
 		let s = document.getSelection();
 		let beginParentArticle = $(s.anchorNode).parents(".article");
 		let endParentArticle = $(s.focusNode).parents(".article");
@@ -663,13 +668,16 @@
 				let relY = event.pageY + document.querySelector("div#content").scrollTop - $(this).offset().top;
 				$("div#toolbar").css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY + 10}px`}).show();
 				// Show annotation
-				let [currentArticle, articleText, i] = getQuoteFromHighlight(event.target);
-				let annotationText = highlights.quotes[articleText][i]?.annotation || "";
-				const urlRegex = /(?:(?:https?|ftp):\/\/|www\.)[^\s/$.?#].[^\s]*[^\s.,\])]/gi;
-				annotationText = annotationText.replace(urlRegex, url => `<a href="${url}">${url}</a>`);
-				$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
-									   +`contenteditable="true">${annotationText}</annotation>`);
-				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`});
+				if ( !$(`annotation#${event.target.id}`).length ) {
+					// If annotation box does not exist for this highlight, create it
+					let [currentArticle, articleText, i] = getQuoteFromHighlight(event.target);
+					let annotationText = highlights.quotes[articleText][i]?.annotation || "";
+					const urlRegex = /(?:(?:https?|ftp):\/\/|www\.)[^\s/$.?#].[^\s]*[^\s.,\])]/gi;
+					annotationText = linkifyUrls(annotationText);
+					$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
+										   +`contenteditable="true">${annotationText}</annotation>`);
+				}
+				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`}).show();
 			}
 			else if (event.target.nodeName == "A") {
 				// Activate the link;
@@ -682,13 +690,17 @@
 				highlights.selected.forEach( async function(h) {
 					// Hide border around selected highlight
 					$(h).css({border: ""});
+					// Hide annotation box
+					$(`annotation#${h.id}`).hide();
 					// Analyze and save content of annotation box
 					let [currentArticle, articleText, i] = getQuoteFromHighlight(h);
 					let previousAnnotation = highlights.quotes[articleText][i].annotation || "";
 					let currentAnnotation = $(`annotation#${h.id}`).text() || "";
 					if ( currentAnnotation != previousAnnotation ) {
 						if (currentAnnotation) {
-							highlights.quotes[articleText][i].annotation = $(`annotation#${h.id}`).text();
+							let annotation = $(`annotation#${h.id}`).text()
+							highlights.quotes[articleText][i].annotation = annotation;
+							$(`annotation#${h.id}`).html(linkifyUrls(annotation));							
 							h.classList.add("annotated");
 						}
 						else {
@@ -697,8 +709,6 @@
 						}
 						await setStorage("highlights-" + act.eli, highlights.quotes);
 					}
-					// Remove annotation box
-					$(`annotation#${h.id}`).remove();
 				});
 				highlights.selected = [];
 				$("div#toolbar").hide();
