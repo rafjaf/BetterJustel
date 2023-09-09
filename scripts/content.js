@@ -573,13 +573,13 @@
 		// Change document title
 		document.querySelector("head > title").text = act.fullTitle;
 		// Set up highlighter
-		$("div#content").on( "mouseup", manageHighlights );
+		$("div#content").on("mouseup", manageHighlights );
 		$("div#content").append("<div id='toolbar' style='display: none;'><div class='circle yellow'></div><div class='circle green'></div><div class='circle blue'></div>"
 								+"<div class='circle red'></div><div class='circle violet'></div><div class='circle'></div></div>");
 		await runDropboxBackup();
 	}
 
-	async function manageHighlights(event) {
+	async function manageHighlights(event) { // event = mouseUp event
 		function getQuoteFromHighlight(h) {
 			let currentArticle = $(h).parents(".article")[0].id;
 			let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
@@ -589,7 +589,7 @@
 		let s = document.getSelection();
 		let beginParentArticle = $(s.anchorNode).parents(".article");
 		let endParentArticle = $(s.focusNode).parents(".article");
-		// Only process selection if it exist and within the same article
+		// Only process selection if it exists and within the same article
 		if (!s.isCollapsed && beginParentArticle.length && endParentArticle && beginParentArticle[0] == endParentArticle[0]) {
 			// Show toolbar
 			let relX = event.pageX + document.querySelector("div#content").scrollLeft - $(this).offset().left;
@@ -663,13 +663,17 @@
 				let relY = event.pageY + document.querySelector("div#content").scrollTop - $(this).offset().top;
 				$("div#toolbar").css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY + 10}px`}).show();
 				// Show annotation
-				if ( !$(`annotation#${event.target.id}`).length ) {
-					// If annotation box does not exist for this highlight, create it
-					let [currentArticle, articleText, i] = getQuoteFromHighlight(event.target);
-					$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
-										   +`contenteditable="true">${highlights.quotes[articleText][i].annotation || ""}</annotation>`);
-				}
-				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`}).show();
+				let [currentArticle, articleText, i] = getQuoteFromHighlight(event.target);
+				let annotationText = highlights.quotes[articleText][i]?.annotation || "";
+				const urlRegex = /(?:(?:https?|ftp):\/\/|www\.)[^\s/$.?#].[^\s]*[^\s.,\])]/gi;
+				annotationText = annotationText.replace(urlRegex, url => `<a href="${url}">${url}</a>`);
+				$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
+									   +`contenteditable="true">${annotationText}</annotation>`);
+				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`});
+			}
+			else if (event.target.nodeName == "A") {
+				// Activate the link;
+				window.open(event.target.href, '_blank');
 			}
 			else if (event.target.nodeName != "ANNOTATION") {
 				// else erase highlight selection, hide annotation and toolbar
@@ -678,8 +682,6 @@
 				highlights.selected.forEach( async function(h) {
 					// Hide border around selected highlight
 					$(h).css({border: ""});
-					// Hide annotation box
-					$(`annotation#${h.id}`).hide();
 					// Analyze and save content of annotation box
 					let [currentArticle, articleText, i] = getQuoteFromHighlight(h);
 					let previousAnnotation = highlights.quotes[articleText][i].annotation || "";
@@ -695,6 +697,8 @@
 						}
 						await setStorage("highlights-" + act.eli, highlights.quotes);
 					}
+					// Remove annotation box
+					$(`annotation#${h.id}`).remove();
 				});
 				highlights.selected = [];
 				$("div#toolbar").hide();

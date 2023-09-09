@@ -56,3 +56,4 @@ It makes use of the following open source libraries :
 - Version 0.1.2023.0530 : improves indent of articles (includes numbering starting with I., II., etc.)
 - Version 0.1.2023.0601 : improves indent of articles (includes numbering starting with i., ii., etc.)
 - Version 0.1.2023.0722 : for some (as yet) unidentified reason, in the Code of Economic Law, some highlights were sometimes saved under an inexistent article, resulting in a bug when trying to restore the highlights for such statute. A work-around has now been found.
+- Version 0.1.2023.0909 : URLs inserted in an annotation will be converted to hyperlinks when the annotation is reopened

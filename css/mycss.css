@@ -292,6 +292,10 @@ annotation {
 	overflow: auto;
 }
 
+annotation a {
+	cursor: pointer;
+}
+
 .yellow {
 	background: #ffee58;
 }
