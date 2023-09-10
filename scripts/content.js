@@ -13,13 +13,21 @@
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-    
-    function injectCSS(url) {
-        let ss = document.createElement("link");
-        ss.type = "text/css";
-        ss.rel = "stylesheet";
-        ss.href = url;
-        document.head.appendChild(ss);
+    	
+	function showStatusMessage(msg) {
+		// Create the popup element
+		const popup = document.getElementById('status');
+		popup.textContent = msg;
+
+		// Show the popup
+		popup.style.transform = 'translateY(0)';
+		popup.style.opacity = '1';
+
+		// After 5 seconds, hide the popup
+		setTimeout(() => {
+			popup.style.transform = 'translateY(100%)';
+			popup.style.opacity = '0';
+		}, 5000);
 	}
 
 	function analyseContent() {
@@ -504,7 +512,7 @@
 		// Erase document and start afresh
 		$("body").children().remove();
 		$("body").append("<div id='main'><div id='info'></div><div id='hsplit'></div><div id ='maincontent'>"
-						 + "<div id='toc'></div><div id='vsplit'></div><div id='content'></div></div></div>");
+						 + "<div id='toc'></div><div id='vsplit'></div><div id='content'></div></div><div id='status'></div></div>");
 		// Set up resizable divs
 		 $("div#info").resizable({
 			 handleSelector: "div#hsplit",
@@ -774,6 +782,7 @@
 				contents: data,
 				mode: {".tag": "overwrite"},
 			});
+			showStatusMessage("Highlights have been backed up to Dropbox");
 			console.log("Backup to Dropbox done", r);
 			highlightsBackup.lastBackup = date;
 			await setStorage("highlightsBackup", highlightsBackup);
@@ -781,12 +790,10 @@
 	}
 
 	function addLoading(msg) {
-			injectCSS(chrome.runtime.getURL("css/mycss.css"));
-			$("body").prepend(`<div id='loading'><div class="loadingio-spinner-spinner-is7uuvdj549"><div class="ldio-zrg2ss6p6ee">`
-							 +`<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>`
-							 +`<div></div><div></div><div></div></div></div><span id='msg'>${msg}</span></div>`);
+		$("body").prepend(`<div id='loading'><div class="loadingio-spinner-spinner-is7uuvdj549"><div class="ldio-zrg2ss6p6ee">`
+						 +`<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>`
+						 +`<div></div><div></div><div></div></div></div><span id='msg'>${msg}</span></div>`);
 	}
-
 	async function main() {
 		// Identify act
 		await analyseFirstInfo();
