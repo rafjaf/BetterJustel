@@ -782,8 +782,9 @@
 				contents: data,
 				mode: {".tag": "overwrite"},
 			});
-			showStatusMessage("Highlights have been backed up to Dropbox");
 			console.log("Backup to Dropbox done", r);
+			const status = r.status == 200 ? "success" : "error " + r.status
+			showStatusMessage(`Highlights have been backed up to Dropbox (${status})`);
 			highlightsBackup.lastBackup = date;
 			await setStorage("highlightsBackup", highlightsBackup);
 		}

@@ -59,3 +59,5 @@ It makes use of the following open source libraries :
 - Version 0.1.2023.0909 : URLs inserted in an annotation will be converted to hyperlinks when the annotation is reopened
 - Version 0.1.2023.0910 : daily backup of highlights is confirmed in a status message at the bottom of the page
 - Version 0.1.2023.0916 : correction of bugs (stylesheet applicable in offline mode)
+- Version 0.1.2023.0917 : improved status message when Dropbox backup done
+
