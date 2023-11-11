@@ -17,7 +17,7 @@
 	function showStatusMessage(msg) {
 		// Create the popup element
 		const popup = document.getElementById('status');
-		popup.textContent = msg;
+		popup.innerHTML = msg;
 
 		// Show the popup
 		popup.style.transform = 'translateY(0)';
@@ -27,7 +27,7 @@
 		setTimeout(() => {
 			popup.style.transform = 'translateY(100%)';
 			popup.style.opacity = '0';
-		}, 5000);
+		}, 10000);
 	}
 
 	function analyseContent() {
@@ -209,7 +209,10 @@
 						contentIndent[i].subparCount = subparCount;
 					}
 				}
-				n.content = content.map((el, i) => `<div style='padding-left: ${contentIndent[i].type * 20}px;'>${contentIndent[i].subparCount > 1 ? "<span class='subpar'>Al. " + contentIndent[i].subparCount + "</span>" : ""}${el}</div>`).join("") + "<br>";
+				n.content = content.map((el, i) => 
+					`<div style='padding-left: ${contentIndent[i].type * 20}px;'>`
+					+ `${contentIndent[i].subparCount > 1 ? "<span class='subpar'>Al. " + contentIndent[i].subparCount + "</span>" : ""}${el}</div>`
+				).join("") + "<br>";
 			}
 			else if (n.titleOngoing) {
 				// This is a heading whose title is ongoing, needs to be closed
@@ -372,7 +375,8 @@
 	function buildContent(nodesArray) {
 		let content = "";
 		for (let n of nodesArray) {
-			content += `<div id="anchor_${n.id}" class="${n.level}">${n.content}</div>`;
+			const bookmark = n.type == "article" ? "<span class='bookmark'></span>" : "";
+			content += `<div id="anchor_${n.id}" class="${n.level}">${bookmark}${n.content}</div>`;
 			if (n.children?.length) {
 				content += buildContent(n.children);
 			}
@@ -472,7 +476,6 @@
 
 	async function displayContent(online) {
 		async function loadHighlights() {
-			// console.log("Start loading highlights", new Date());
 			highlights = {
 				quotes: await getStorage("highlights-" + act.eli) || {},
 				selected: [],
@@ -480,29 +483,39 @@
 			};
 			let changesMade = false;
 			for (let key in highlights.quotes) {
-				let article = $(`div#toc a:contains("${key}")`)?.[0]?.id;
-				if (!key || !article) {
-					console.info(`Loaded page does not contain anymore "${key}" article, deleting highlight from database`);
-					delete highlights.quotes[key];
-					changesMade = true;
+				if (key == "bookmarks") {
+					for (let bookmark in highlights.quotes.bookmarks) {
+						let article = $(`div#toc a:contains("${bookmark}")`)?.[0]?.id;
+						document.querySelector(`div#content div#anchor_${article.slice(0,9)}`)?.classList?.add("bookmark");
+					}
 				}
 				else {
-					for (let q of highlights.quotes[key]) {
-						let range = anchoring.TextQuoteAnchor.toRange(document.querySelector(`div#content div#anchor_${article.slice(0,9)}`), q);
-						if (!range) {
-							console.info(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
-							let i = highlights.quotes[key].findIndex(el => el.id == q.id);
-							highlights.quotes[key].splice(i, 1);
-							if (!highlights.quotes[key].length) { delete highlights.quotes[key]; }
-							changesMade = true;
-						}
-						else {
-							let h = document.createElement("highlight");
-							h.id = q.id;
-							h.classList.add(q.color);
-							if (q.annotation) { h.classList.add("annotated"); }
-							let wrapper = anchoring.WrapRangeText(h, range);
-							highlights.wrappers[h.id] = wrapper;
+					let article = $(`div#toc a:contains("${key}")`)?.[0]?.id;
+					if (!key || !article) {
+						showStatusMessage(`Loaded page does not contain anymore "${key}" article, deleting highlight from database`);
+						console.info(`Loaded page does not contain anymore "${key}" article, deleting highlight from database`);
+						delete highlights.quotes[key];
+						changesMade = true;
+					}
+					else {
+						for (let q of highlights.quotes[key]) {
+							let range = anchoring.TextQuoteAnchor.toRange(document.querySelector(`div#content div#anchor_${article.slice(0,9)}`), q);
+							if (!range) {
+								showStatusMessage(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
+								console.info(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
+								let i = highlights.quotes[key].findIndex(el => el.id == q.id);
+								highlights.quotes[key].splice(i, 1);
+								if (!highlights.quotes[key].length) { delete highlights.quotes[key]; }
+								changesMade = true;
+							}
+							else {
+								let h = document.createElement("highlight");
+								h.id = q.id;
+								h.classList.add(q.color);
+								if (q.annotation) { h.classList.add("annotated"); }
+								let wrapper = anchoring.WrapRangeText(h, range);
+								highlights.wrappers[h.id] = wrapper;
+							}
 						}
 					}
 				}
@@ -511,8 +524,17 @@
 		}
 		// Erase document and start afresh
 		$("body").children().remove();
-		$("body").append("<div id='main'><div id='info'></div><div id='hsplit'></div><div id ='maincontent'>"
-						 + "<div id='toc'></div><div id='vsplit'></div><div id='content'></div></div><div id='status'></div></div>");
+		$("body").append(`<div id='main'>
+								<div id='info'></div>
+								<div id='hsplit'></div>
+								<div id ='maincontent'>
+									<div id='toc'></div>
+									<div id='vsplit'></div>
+									<div id='content'></div>
+								</div>
+								<div id='bookmark-bar'><div id='minmax'>▼</div><div id='title'>Bookmarks</div><div id='items'></div></div>
+								<div id='status'></div>
+							</div>`);
 		// Set up resizable divs
 		 $("div#info").resizable({
 			 handleSelector: "div#hsplit",
@@ -561,6 +583,7 @@
 			.on("ready.jstree", async function (event, data) {
 				$(this).jstree("open_all");
 				await loadHighlights();
+				updateBookmarkBar();
 			})
 			.on("select_node.jstree", function(event, data) {
 				$("div#anchor_" + data.node.id)[0].scrollIntoView( true );
@@ -580,11 +603,35 @@
 		});
 		// Change document title
 		document.querySelector("head > title").text = act.fullTitle;
+		// Set up bookmark bar
+		$("div#bookmark-bar").draggable();
+		$("div#bookmark-bar div#items div").on('mousedown', function(e) {
+			e.stopPropagation(); // Prevents the mousedown event from reaching the parent
+		});
+		$("div#bookmark-bar div#items").click(function(e){
+			$("div#" + e.target.getAttribute("target"))[0].scrollIntoView(true);
+		})
+		$("div#bookmark-bar div#minmax").click(function() {
+			const div = document.querySelector("div#bookmark-bar div#items");
+			if (div.style.display == "none") {
+				div.style.display = "block";
+			}
+			else {
+				div.style.display = "none";
+			}
+		});
 		// Set up highlighter
 		$("div#content").on("mouseup", manageHighlights );
 		$("div#content").append("<div id='toolbar' style='display: none;'><div class='circle yellow'></div><div class='circle green'></div><div class='circle blue'></div>"
 								+"<div class='circle red'></div><div class='circle violet'></div><div class='circle'></div></div>");
 		await runDropboxBackup();
+		// Display status message if extension was updated
+		const lastVersion = await getStorage("extensionVersion");
+		const currentVersion = chrome.runtime.getManifest().version;
+		if (lastVersion != currentVersion) {
+			showStatusMessage(`Extension updated to version ${currentVersion}. Click <a href="https://github.com/rafjaf/BetterJustel#release-history" target="_blank">here</a> for more info`);
+			await setStorage("extensionVersion", currentVersion);
+		}
 	}
 
 	async function manageHighlights(event) { // event = mouseUp event
@@ -691,6 +738,26 @@
 				// Activate the link;
 				window.open(event.target.href, '_blank');
 			}
+			else if (event.target.nodeName == "SPAN" && event.target.classList.contains("bookmark")) {
+				// Click on bookmark
+				let currentArticleElem = $(event.target).parents(".article")[0];
+				let currentArticle = currentArticleElem.id;
+				let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+				if (currentArticleElem.classList.contains("bookmark")) {
+					// Remove bookmark from this article
+					currentArticleElem.classList.remove("bookmark");
+					delete highlights.quotes.bookmarks[articleText];
+					await setStorage("highlights-" + act.eli, highlights.quotes);
+				}
+				else {
+					// Add bookmark to this article
+					currentArticleElem.classList.add("bookmark");
+					highlights.quotes.bookmarks = highlights.quotes.bookmarks || {};
+					highlights.quotes.bookmarks[articleText] = true;
+					await setStorage("highlights-" + act.eli, highlights.quotes);
+				}
+				updateBookmarkBar();
+			}
 			else if (event.target.nodeName != "ANNOTATION") {
 				// else erase highlight selection, hide annotation and toolbar
 				currentRange = null;
@@ -758,7 +825,7 @@
 		catch(e) {
 			document.querySelector("div#loading").innerHTML = `Error while loading, click <a href=${window.location.origin + window.location.pathname}`
 				+`${window.location.search ? window.location.search + "&" : "?"}noJS=true>here</a> to disable javascript`;
-			console.error(e);
+			console.error(e.message);
 			return;
 		}
 		await displayContent(true);
@@ -788,6 +855,22 @@
 			highlightsBackup.lastBackup = date;
 			await setStorage("highlightsBackup", highlightsBackup);
 		}
+	}
+	
+	function updateBookmarkBar() {
+		const bookmarks = document.querySelectorAll("div.article.bookmark");
+		if (!bookmarks.length) {
+			document.querySelector("div#bookmark-bar").style.display = "none";
+			return
+		}
+		document.querySelector("div#bookmark-bar").style.display = "block";
+		let html = ""
+		for (const b of bookmarks) {
+			const node = b.id.split("_")[1];
+			const title = document.querySelector("li#" + node).textContent;
+			html += `<div target="${b.id}">${title}</div>`;
+		}
+		document.querySelector("div#bookmark-bar div#items").innerHTML = html;
 	}
 
 	function addLoading(msg) {

@@ -331,6 +331,31 @@ div.article:hover span.subpar {
 	visibility: visible;
 }
 
+span.bookmark {
+	position: absolute;
+	margin-left: -25px;
+	margin-top: -4px;
+	opacity: 0;
+}
+
+span.bookmark::before {
+	content: "☆";
+}
+
+div.article.bookmark span.bookmark::before {
+	content: "★";
+	color: darkorange;
+}
+
+div.article:hover span.bookmark {
+	opacity: 1;
+}
+
+span.bookmark:hover {
+	opacity: 1;
+	cursor: pointer;
+}
+
 div#status {
 	position: fixed;
 	bottom: 0;
@@ -347,3 +372,42 @@ div#status {
 	transition: transform 1s ease-in-out, opacity 1s ease-in-out;
 }
 
+div#status a {
+	color: yellow;
+}
+
+div#bookmark-bar {
+	display: none;
+	position: absolute;
+	top: 10px;
+	right: 15px;
+	width: 200px;
+	background-color: cornflowerblue;
+	padding: 5px;
+	overflow: auto;
+	max-height: 300px;
+}
+div#bookmark-bar div#minmax {
+	float: right;
+	cursor: pointer;
+	position: relative;
+	top: 8px;
+	right: 8px;
+}
+div#bookmark-bar div#title {
+	background-color: #e2e2e2;
+	color: #333;
+	font-weight: bold;
+	padding: 8px;
+	cursor: grab;
+}
+
+div#bookmark-bar div#items div {
+	padding: 3px;
+    margin: 4px 0;
+    background-color: #FFFFFF;
+    border-radius: 4px;
+    cursor: pointer;
+    height: 17px;
+    overflow-y: hidden;
+}

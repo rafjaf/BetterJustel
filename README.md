@@ -43,6 +43,7 @@ It makes use of the following open source libraries :
 - download.js 4.2 &lt;https://github.com/rndme/download&gt;
 - Dropbox SDK &lt;https://github.com/dropbox/dropbox-sdk-js&gt;
 - jquery 3.6.1 &lt;https://jquery.com/&gt;
+- jquery UI 1.21.1 &lt;https://jqueryui.com/&gt;
 - jquery resizable plugin 0.35 &lt;https://github.com/RickStrahl/jquery-resizable&gt;
 - jsTree 3.3.12 &lt;https://www.jstree.com/&gt;
 
@@ -60,4 +61,5 @@ It makes use of the following open source libraries :
 - Version 0.1.2023.0910 : daily backup of highlights is confirmed in a status message at the bottom of the page
 - Version 0.1.2023.0916 : correction of bugs (stylesheet applicable in offline mode)
 - Version 0.1.2023.0917 : improved status message when Dropbox backup done
+- Version 0.1.2023.1111 : added an ability to bookmark articles and to display a bookmark bar (just click on the star appearing next to each article when hovering the mouse on the article text). The bookmark bar is draggable and can be minimised.
 

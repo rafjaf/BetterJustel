@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Better Justel",
   "description": "Improves Belgian eJustice Justel website",
-  "version": "0.1.2023.0917",
+  "version": "0.1.2023.1111",
   "icons": {
     "16": "images/justice_scales_16.png",
     "32": "images/justice_scales_32.png",
@@ -34,6 +34,7 @@
 		"scripts/download.js",
 		"scripts/Dropbox-sdk.min.js",
 		"scripts/jquery.min.js",
+		"scripts/jquery-ui.min.js",
 		"scripts/jquery-resizable.min.js",
 		"scripts/jstree.min.js",
 		"scripts/standalone-anchoring.js",
