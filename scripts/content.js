@@ -536,11 +536,11 @@
 								<div id='status'></div>
 							</div>`);
 		// Set up resizable divs
-		 $("div#info").resizable({
+		 $("div#info").resizableSafe({
 			 handleSelector: "div#hsplit",
 			 resizeWidth: false
 		 });
-		 $("div#toc").resizable({
+		 $("div#toc").resizableSafe({
 			 handleSelector: "div#vsplit",
 			 resizeHeight: false
 		 });
@@ -629,7 +629,7 @@
 		const lastVersion = await getStorage("extensionVersion");
 		const currentVersion = chrome.runtime.getManifest().version;
 		if (lastVersion != currentVersion) {
-			showStatusMessage(`Extension updated to version ${currentVersion}. Click <a href="https://github.com/rafjaf/BetterJustel#release-history" target="_blank">here</a> for more info`);
+			showStatusMessage(`Better Justel has been updated to version ${currentVersion}. Click <a href="https://github.com/rafjaf/BetterJustel#release-history" target="_blank">here</a> for more info`);
 			await setStorage("extensionVersion", currentVersion);
 		}
 	}
