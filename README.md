@@ -63,3 +63,4 @@ It makes use of the following open source libraries :
 - Version 0.1.2023.0917 : improved status message when Dropbox backup done
 - Version 0.1.2023.1111 : added an ability to bookmark articles and to display a bookmark bar (just click on the star appearing next to each article when hovering the mouse on the article text). The bookmark bar is draggable and can be minimised.
 - Version 0.1.2023.1113 : correction of a bug (incompatibility between jquery UI and jquery resizable)
+- Version 0.1.2023.1116 : improvement of CSS (position of bookmark star)

@@ -240,8 +240,16 @@ div#content div.level7 {
 	margin-left: 120px;
 }
 
+div#content div.article {
+	position: relative;
+}
+
 div#content div.article div {
 	margin-top: 9px;
+}
+
+div#content div.article div sup {
+	vertical-align: bottom;
 }
 
 div#content div.nostyle {
