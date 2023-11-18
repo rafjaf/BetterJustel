@@ -608,8 +608,22 @@
 		$("div#bookmark-bar div#items div").on('mousedown', function(e) {
 			e.stopPropagation(); // Prevents the mousedown event from reaching the parent
 		});
-		$("div#bookmark-bar div#items").click(function(e){
-			$("div#" + e.target.getAttribute("target"))[0].scrollIntoView(true);
+		$("div#bookmark-bar div#items").click(async function(e){
+			switch(e.target.className) {
+				case "bookmark":
+					// Remove bookmark from this article
+					let currentArticleElem = document.querySelector("div#" + e.target.nextElementSibling.getAttribute("target"));
+					let currentArticle = currentArticleElem.id;
+					let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+					currentArticleElem.classList.remove("bookmark");
+					delete highlights.quotes.bookmarks[articleText];
+					await setStorage("highlights-" + act.eli, highlights.quotes);
+					updateBookmarkBar();
+					break;
+				case "item":
+					$("div#" + e.target.getAttribute("target"))[0].scrollIntoView(true);
+					break;
+			}
 		})
 		$("div#bookmark-bar div#minmax").click(function() {
 			const div = document.querySelector("div#bookmark-bar div#items");
@@ -868,7 +882,7 @@
 		for (const b of bookmarks) {
 			const node = b.id.split("_")[1];
 			const title = document.querySelector("li#" + node).textContent;
-			html += `<div target="${b.id}">${title}</div>`;
+			html += `<div><span class="bookmark"></span><span class="item" target="${b.id}">${title}</span></div>`;
 		}
 		document.querySelector("div#bookmark-bar div#items").innerHTML = html;
 	}

@@ -339,14 +339,14 @@ div.article:hover span.subpar {
 	visibility: visible;
 }
 
-span.bookmark {
+div.article span.bookmark {
 	position: absolute;
 	margin-left: -25px;
 	margin-top: -4px;
 	opacity: 0;
 }
 
-span.bookmark::before {
+div.article span.bookmark::before {
 	content: "☆";
 }
 
@@ -417,5 +417,14 @@ div#bookmark-bar div#items div {
     border-radius: 4px;
     cursor: pointer;
     height: 17px;
+    line-height: 17px;
     overflow-y: hidden;
 }
+
+
+div#bookmark-bar div#items div span.bookmark::before {
+	content: "★";
+	color: darkorange;
+	margin-right: 5px;
+}
+
