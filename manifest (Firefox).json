@@ -1,0 +1,76 @@
+{
+  "manifest_version": 3,
+  "name": "Better Justel",
+  "description": "Improves Belgian eJustice Justel website",
+  "version": "0.1.2023.1118",
+  "icons": {
+    "16": "images/justice_scales_16.png",
+    "32": "images/justice_scales_32.png",
+    "48": "images/justice_scales_48.png",
+    "128": "images/justice_scales_128.png"
+  },
+  "permissions": [
+	"storage",
+	"unlimitedStorage"
+  ],
+  "action": {
+	"default_icon": {
+	  "16": "images/justice_scales_16.png",
+	  "24": "images/justice_scales_24.png",
+	  "32": "images/justice_scales_32.png"
+    },
+    "default_popup": "html/popup.html"
+  },
+  "background": {
+	  "scripts": ["scripts/background.js"]
+  },
+  "content_scripts": [
+    {
+      "css": [
+		"css/jstree.css",
+		"css/mycss.css"
+      ],
+      "js": [
+		"scripts/download.js",
+		"scripts/Dropbox-sdk.min.js",
+		"scripts/jquery.min.js",
+		"scripts/jquery-ui.min.js",
+		"scripts/jquery-resizable.min.js",
+		"scripts/jstree.min.js",
+		"scripts/standalone-anchoring.js",
+		"scripts/content.js"
+      ],
+      "matches": [
+        "https://www.ejustice.just.fgov.be/cgi_loi/loi_a1.pl*",
+        "https://www.ejustice.just.fgov.be/eli/*",
+        "https://www.ejustice.just.fgov.be/loi/loi.htm*"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "host_permissions": [
+	"https://www.ejustice.just.fgov.be/eli/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ 
+		"css/mycss.css",
+		"html/offline.html",
+		"images/fond5.jpg",
+		"images/jstree_32px.png",
+		"images/jstree_40px.png",
+		"images/jstree_throbber.gif",
+		"images/save.png",
+		"scripts/util.js"
+	  ],
+      "matches": [ 
+		"https://www.ejustice.just.fgov.be/*"
+	  ]
+    }
+  ],
+  "browser_specific_settings": {
+	"gecko": {
+		"id": "{b10df66f-7b07-4f1d-b6f4-1c7cd883d8b7}"
+	 }
+  }
+}
