@@ -30,6 +30,29 @@
 		}, 10000);
 	}
 
+	function findObjectById(obj, id) {
+	  // Check if the current object has the desired ID
+	  if (obj && obj.id === id) {
+		return obj;
+	  }
+
+	  // Iterate over each key in the current object
+	  for (const key in obj) {
+		// Check if the current key's value is an object
+		if (typeof obj[key] === 'object' && obj[key] !== null) {
+		  // Recursively search for the ID in the nested object
+		  const result = findObjectById(obj[key], id);
+
+		  // If the ID is found, return the result
+		  if (result) {
+			return result;
+		  }
+		}
+	  }	  
+	  // Return null if the ID is not found
+	  return null;
+	};
+
 	function analyseContent() {
 		// Declarations
 		let currentParents = [], lastNode, counter = 1;
@@ -614,7 +637,8 @@
 					// Remove bookmark from this article
 					let currentArticleElem = document.querySelector("div#" + e.target.nextElementSibling.getAttribute("target"));
 					let currentArticle = currentArticleElem.id;
-					let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+					// let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+					let articleText = findObjectById(act, currentArticle.slice(7)).text;
 					currentArticleElem.classList.remove("bookmark");
 					delete highlights.quotes.bookmarks[articleText];
 					await setStorage("highlights-" + act.eli, highlights.quotes);
@@ -651,7 +675,8 @@
 	async function manageHighlights(event) { // event = mouseUp event
 		function getQuoteFromHighlight(h) {
 			let currentArticle = $(h).parents(".article")[0].id;
-			let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+			// let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+			let articleText = findObjectById(act, currentArticle.slice(7)).text;
 			let i = highlights.quotes[articleText].findIndex(el => el.id == h.id);
 			return [currentArticle, articleText, i];
 		}
@@ -716,7 +741,8 @@
 						h.id = Date.now().toString(36) + Math.random().toString(36).substr(2);
 						let wrapper = anchoring.WrapRangeText(h, currentRange);
 						// Save highlight
-						let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+						// let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+						let articleText = findObjectById(act, currentArticle.slice(7)).text;
 						quoteSelector.color = event.target.classList[1];
 						quoteSelector.id = h.id;
 						highlights.quotes[articleText] = highlights.quotes[articleText] || [];
@@ -756,7 +782,8 @@
 				// Click on bookmark
 				let currentArticleElem = $(event.target).parents(".article")[0];
 				let currentArticle = currentArticleElem.id;
-				let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+				// let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
+				let articleText = findObjectById(act, currentArticle.slice(7)).text;
 				if (currentArticleElem.classList.contains("bookmark")) {
 					// Remove bookmark from this article
 					currentArticleElem.classList.remove("bookmark");
@@ -881,7 +908,8 @@
 		let html = ""
 		for (const b of bookmarks) {
 			const node = b.id.split("_")[1];
-			const title = document.querySelector("li#" + node).textContent;
+			// const title = document.querySelector("li#" + node).textContent;
+			const title = findObjectById(act, node).text;
 			html += `<div><span class="bookmark"></span><span class="item" target="${b.id}">${title}</span></div>`;
 		}
 		document.querySelector("div#bookmark-bar div#items").innerHTML = html;
