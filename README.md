@@ -2,7 +2,7 @@
 
 ## Concept
 
-This browser extension (available for [Chrome](https://chrome.google.com/webstore/detail/better-justel/jjknlnihcjeefjgdacaanbiedamibimp) and [Firefox](https://addons.mozilla.org/fr/firefox/addon/better-justel/)) takes the information publicly available on [Justel](https://www.ejustice.just.fgov.be/loi/loi.htm), the Belgian database of consolidated legislation, and displays it in a more user-friendly experience.
+This browser extension (available for [Chrome](https://chrome.google.com/webstore/detail/better-justel/jjknlnihcjeefjgdacaanbiedamibimp) and [Firefox](https://addons.mozilla.org/fr/firefox/addon/better-justel/)) takes the information publicly available on [Justel](https://www.ejustice.just.fgov.be/cgi_loi/rech.pl?language=fr), the Belgian database of consolidated legislation, and displays it in a more user-friendly experience.
 
 IMPORTANCE NOTICE: If you are using the Firefox extension, the first time you will surf to Justel website, a blue dot will appear on the icon of the extension. You must right-click on the extension icon and grant it permission to always run on www.ejustice.fgov.be. Otherwise, the extension will not work.
 
@@ -12,6 +12,8 @@ IMPORTANCE NOTICE: If you are using the Firefox extension, the first time you wi
 
 ## Features
 
+- On the search page, three buttons allow to easily select statutes, royal decrees or treaties as the nature of the act to be searched. The place on the page of the date of promulgation and the date of publication are swapped, because a search based on the date of promulgation is more common. By default, a search is based on the title of the act rather than its content to narrow down the results.
+- On the results page, each link opens the act in a new windows by default.
 - The page on which each act is displayed is divided in three panes : the upper pane containing general information on the act; the left pane with a table of content; and the right pane displaying the content of the act. Each pane can be resized by hovering the mouse on the dividing line and dragging it.
 - In the info pane, the icon of a disk allows to download and automatically name the consolidated version of the act in PDF. The link "Clear database" removes the act from the offline database. The link "Disable extension" shows the original text of the act, without the extension.
 - The left pane displays the internal structure of the acte based on its headings (Title, Chapter, Section, etc.) and allows to jump immediately to the relevant part of the act by clicking on an article. The table of content can be fully collapsed or expanded with two different buttons.
