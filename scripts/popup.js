@@ -62,15 +62,18 @@ async function exportAllHighlights() {
 async function populateListOfStoredActs() {
 	async function clearStorage (event) {
 		let act = event.target.parentElement.parentElement.parentElement.children[1].children[0];
-		let proceed = confirm("Press OK to remove from the offline database, including all highlights, " + act.innerText);
+		let proceed = confirm("Press OK to remove from the offline database " + act.innerText + ". Highlights will not be affected");
 		if (proceed) {
 			let eli = act.href;
 			// Clear text content in database
 			let listOfActs = await getStorage("updateInfo");
 			delete listOfActs[eli];
 			await setStorage("updateInfo", listOfActs);
+			let numac2eli = await getStorage("numac2eli");
+			delete numac2eli[eli];
+			await setStorage("numac2eli", numac2eli);
 			// Clear highlights in database
-			await setStorage("highlights-" + eli, "");
+			// await setStorage("highlights-" + eli, "");
 			// Remove from popup list of acts
 			event.target.parentElement.parentElement.parentElement.remove();
 		}

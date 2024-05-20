@@ -5,7 +5,7 @@
 	const DROPBOX_REDIRECT_URL = "https://www.ejustice.just.fgov.be/eli/";
 	
 	const HEADINGS_TYPE = ["partie", "livre", "titre", "sous-titre", "chapitre", "section", "sous-section", "paragraphe", "§"];
-	let act = {content: []}, updateInfo, highlights, currentArticle, currentRange, highlightsBackup;
+	let act = {content: []}, updateInfo, highlights, currentArticle, currentRange, highlightsBackup, numac2eli;
 	let headingsWhoseTypeNeedsToBeDefined = [];
 	
 	let {getStorage, setStorage, getAllHighlights} = await import(chrome.runtime.getURL('scripts/util.js'));
@@ -267,15 +267,24 @@
 			return (article);
 		}
 		// Main analyseContent
-		let contentNodes = Array.from(Array.from(document.querySelectorAll("body > table > tbody > tr:nth-child(1) > th:nth-child(1)"))
-			.filter(el => el.textContent.indexOf("Texte") > -1)[0].parentElement.nextElementSibling.children[0].childNodes);
-		// Correct erroneous encoding of the text
-		const WRONG_LAST_NODENAME = ["ERRATUM,M.B.", "I", "BR&GT;<BR", "L"];
-		while ( WRONG_LAST_NODENAME.some(el => el == contentNodes.slice(-1)[0].nodeName) ) {
-			contentNodes = contentNodes.concat( Array.from( contentNodes.slice(-1)[0].childNodes ) );
-		}
+		addLoading("Analysing content of the act");
+		document.querySelector("div#list-title-3 h2").remove();
+		let contentNodes = Array.from(document.querySelector("div#list-title-3").childNodes);
+		// Also correct p elements which contain articles 
+		const WRONG_LAST_NODENAME = ["ERRATUM,M.B.", "I", "BR&GT;<BR", "L", "P"];
+		let i = 0;
+		do {
+			// Using do ... while instead of forEach because the number of the elements of the array is affected by the loop
+			let el = contentNodes[i];
+			if (WRONG_LAST_NODENAME.some(w => el.nodeName == w)) { 
+				console.log("Correcting wrong structure of the page at element", i, el);
+				let newArray = Array.from ( el.childNodes );
+				contentNodes.splice(i, 1, ...newArray );
+			}
+			i++;
+		} while (i != contentNodes.length);
 		// Anlyse each node depending on their type
-		for (let n of contentNodes) {
+		for (let [index, n] of contentNodes.entries()) {
 			if ( (n.nodeName == "A") && (n.name) && (n.name.startsWith("LNK") && !(n.textContent.toLowerCase().startsWith("annexe")) ) ) {
 				// This is a heading
 				if (lastNode) { beautify(lastNode); }
@@ -322,6 +331,8 @@
 						// lastNode.text += (text[0] == "." ? "" : " ") + text;
 						lastNode.text += (text[0] == "." ? text : "");
 						lastNode.content += n.textContent.replace(/</g, "&lt;");
+						// Correction for Art. 1
+						if (!lastNode.text && n.textContent.startsWith("Article")) {lastNode.text = "Art. ";}
 					}
 					else {
 						// Test if a heading was erroneously inserted as the end of an article (wrong subdivision)
@@ -408,54 +419,67 @@
 	}
 
 	async function analyseFirstInfo() {
-		// Capture act info (first table is missing at this stage)
-		let titleTable = document.querySelectorAll("body > table")[1];
-		if (!titleTable?.querySelector("tbody > tr:nth-child(3) > th > b")) {
-			// Function is run too early, before page was loaded
+		// Capture numac of the act from the top of the page
+		act.numac = document.querySelector("div#list-title-1 span.tag")?.textContent;
+		while (!act.numac) {  
+			addLoading("Checking Justel server for an updated version of the page");
 			await delay(500);
-			await analyseFirstInfo();
-			return
+			act.numac = document.querySelector("div#list-title-1 span.tag")?.textContent;
 		}
-		act.eli = document.querySelectorAll("body > table")[0].querySelector("tbody > tr:nth-child(9) > td")?.textContent?.replace("http:", "https:");
-		if (!act.eli) {act.eli = window.location.href.replace("http:", "https:");}
-		// Act type, date and title
-		act.type = act.eli.split("/")[4];
-		if (act.type.indexOf("loi_a1.pl") > -1) {act.type = "traité";}
-		act.date = act.eli.split("/").slice(5,8).join("-");
-		if (!act.date) {
-			const MONTH_FR = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout",
-							  "septembre", "octobre", "novembre", "decembre"];
-			let text = document.querySelectorAll("body > table")[1].querySelector("th b").innerText.toLowerCase();
-			let components = text.match(/^(\d+)+\s(\w+)\s(\d+)/);
-			act.date = components[3] + "-" + (MONTH_FR.indexOf(components[2]) + 1).toString().padStart(2, "0") + "-" + components[1];
+		// Check if ELI can be determined from numac
+		if (numac2eli[act.numac]) {
+			act.eli = numac2eli[act.numac];
+			if (act.eli.match(/numac/)) {
+				act.type = "traité";
+			}
 		}
-		act.title = titleTable.querySelector("tbody > tr:nth-child(3) > th > b")
-			.firstChild.textContent.replace(/\(.+/, "")
+		else {
+			// We must wait for the full page to load (eli should be at the end)
+			addLoading("Loading page from Justel server");
+			act.eli = document.querySelector("a#link-text")?.href;
+			while ( !act.eli && (document.readyState != "complete") ) {
+				await delay(500);
+				act.eli = document.querySelector("a#link-text")?.href;
+			}
+			if (!act.eli) {
+				// eli cannot be determined, used numac instead
+				act.eli = "https://www.ejustice.just.fgov.be/cgi_loi/article.pl?language=fr&numac_search=" + act.numac;
+				act.type = "traité";
+			}
+			// Save ELI in numac2eli database
+			numac2eli[act.numac] = act.eli;
+			await setStorage("numac2eli", numac2eli);
+		}
+		// Get act type, date and title
+		if (act.type == "traité") {
+			 act.date = act.numac.slice(0,4) + "-" + act.numac.slice(4,6) + "-" + act.numac.slice(6,8);
+		}
+		else {
+			act.type = act.eli.split("/")[4];
+			act.date = act.eli.split("/").slice(5,8).join("-");
+		}
+		let title = document.querySelector("div#list-title-1 p.list-item--title")
+			.textContent.replace(/\(.+/, "")
 			.split("-").slice(1).join("-").trim().split(" ");
-		if (act.title[0] != "CODE") {
-			act.title = act.title.slice(1);
+		if (title[0] != "CODE") {
+			title = title.slice(1);
 		}
-		act.title = act.title.join(" ");
-		act.fullTitle = `${act.type.slice(0,1).toUpperCase()}. ${act.date} ${act.title}`;
-		act.lastUpdate = titleTable.querySelector("tbody > tr:nth-child(3) > th")
-						 .innerHTML.split("mise à jour au")?.[1]?.match(/(\d{2})-(\d{2})-(\d{4})/)
+		title = title.join(" ");
+		if (act.type == "traité" && title.match(/COLLECTIVE/)) { act.type = "cct" }
+		act.fullTitle = `${act.type.slice(0,1).toUpperCase()}. ${act.date} ${title}`;
+		act.lastUpdate = document.querySelector("div#list-title-1 p.list-item--title")
+						 .textContent.split("mise à jour au")?.[1]?.match(/(\d{2})-(\d{2})-(\d{4})/)
 						 ?.slice(1)?.reverse()?.join("-")
 						 || act.date;
 	}
 
 	function analyseFurtherInfo() {
-		// Consolidated PDF ?
-		let consolidatedPDF = Array.from(document.querySelectorAll("body > table")[1].querySelectorAll("tbody > tr:nth-child(3) > th > a"))
-			.filter(a => a.href.indexOf("/img_l/pdf") > -1);
-		if (consolidatedPDF.length) {
-			act.consolidatedPDF = consolidatedPDF[0].href;
-			$(consolidatedPDF[0]).after(`<a id='btnSavePDF'><img src='${chrome.runtime.getURL("images/save.png")}'></a`);
-		}
+		// Original and consolidated PDF
+		let originalPDF = Array.from(document.querySelectorAll("div.links-box a")).filter(a => a.href.indexOf("/mopdf") > -1)[0]?.href;
+		let consolidatedPDF = Array.from(document.querySelectorAll("div.links-box a")).filter(a => a.href.indexOf("/img_l/pdf") > -1)[0]?.href;
 		// Preamble and Report to the King ?
-		let preamble = Array.from(document.querySelectorAll("body > table > tbody > tr:nth-child(1) > th:nth-child(1)"))
-			.filter(el => el.textContent.indexOf("Préambule") > -1);
-		let report = Array.from(document.querySelectorAll("body > table > tbody > tr:nth-child(1) > th:nth-child(1)"))
-			.filter(el => el.textContent.indexOf("Rapport au Roi") > -1);
+		let preamble = document.querySelector("div#list-title-sw_prev");
+		let report = document.querySelector("div#list-title-sw_roi");
 		let heading = {}, article = {};
 		heading.id = "visas";
 		heading.type = "visas";
@@ -463,38 +487,49 @@
 		heading.text = "Visas";
 		heading.content = "Visas";
 		heading.children = [];
-		if (preamble.length && (act.type != "loi")) {
-			let preambleContent = "<br><div class='level2'>Préambule</div>"
-				+ $(preamble[0]).parent().next().children().html();
-			heading.children.push({id: "preamble_text", type: "article", level: "article", text: "Préambule", content: preambleContent});
+		if (preamble && (act.type != "loi")) {
+			let preambleContent = preamble.innerHTML;
+			heading.children.push({id: "preamble0", type: "article", level: "article", text: "Préambule", content: preambleContent});
 		}
-		if (report.length) {
-			let reportContent = "<br><div class='level2'>Rapport au Roi</div>"
-				+ $(report[0]).parent().next().children().html();
-			heading.children.push({id: "report_text", type: "article", level: "article", text: "Rapport au Roi", content: reportContent});
+		if (report) {
+			let reportContent = report.innerHTML;
+			heading.children.push({id: "report000", type: "article", level: "article", text: "Rapport au Roi", content: reportContent});
 		}
 		if (heading.children.length) {
 			headingsWhoseTypeNeedsToBeDefined.push(heading);
 			act.content.push(heading);
 		}
 		// General information on the act
-		act.info = document.querySelectorAll("body > table")[1].querySelector("tbody > tr:nth-child(3) > th").innerHTML;
-		let additionalInfo = [];
-		const INFO_URL_PARTS = ["arrexec", "arch_a", "wet", "reflex"];
-		const anchors = Array.from(document.querySelectorAll("body > table")[0].querySelectorAll("a"));
-		for (let u of INFO_URL_PARTS) {
-			let a = anchors.filter(el => el.href.indexOf(u) > -1);
-			if (a.length) {
-				a[0].target = "_blank";
-				if (u == "wet") {a[0].href += "&noJS=true";}
-				additionalInfo.push(a[0].outerHTML);
-			}
+		// Remove numac tag
+		document.querySelector("div#list-title-1 span.tag").remove();
+		// Separate title of the act from additional notes and the last update date
+		document.querySelector("div#list-title-1 p.list-item--title").innerHTML
+			= document.querySelector("div#list-title-1 p.list-item--title").innerHTML
+			  .replace(/(\s+)?(.+?)(\(NOTE.+)/, "<span class='title'>$2</span>$3")
+			  .replace(/(mise à jour au \d{2}-\d{2}-\d{4})/, "<span class='update'>$1</span>")
+			  .replace(/(annulé)/, "<span class='update'>$1</span>");
+		if (!document.querySelector("div#list-title-1 p.list-item--title").innerHTML.match(/NOTE/)) {
+			document.querySelector("div#list-title-1 p.list-item--title").innerHTML
+			= "<span class='title'>" + document.querySelector("div#list-title-1 p.list-item--title").innerHTML + "</span>";
 		}
+		// Make sure links open in a new page
+		Array.from(document.querySelectorAll("div#list-title-1 div.plain-text a")).forEach(a => a.target = "_blank");
+		act.info = document.querySelector("div#list-title-1 div.list-item--content").innerHTML
+			.replace(/<p>/g, "<span>").replace(/<\/p>/g, "</span>");
+		let additionalInfo = [];
 		additionalInfo.push(`<a href='${act.eli}' target="_blank">ELI</a>`);
+		if (originalPDF) { additionalInfo.push(`<a href='${originalPDF}' target="_blank">Moniteur belge</a>`); }
+		if (consolidatedPDF) { 
+			additionalInfo.push(`<a href='${consolidatedPDF}' target="_blank">PDF consolidé</a>`);
+			additionalInfo.push(`<a id='btnSavePDF'><img src='${chrome.runtime.getURL("images/save.png")}'></a>`);
+		}
+		if (document.querySelector("div.external-links")) {
+			document.querySelectorAll("div.external-links a").forEach(a => additionalInfo.push(a.outerHTML));
+		}
 		additionalInfo.push(`<a id='clearDB' href='#'>Clear storage</a>`);
 		additionalInfo.push(`<a href="${window.location.origin + window.location.pathname}`
-							+`${window.location.search ? window.location.search + "&" : "?"}noJS=true" target="_blank">Disable extension</a></b>`);
-		act.info += "<br><div id='addinfodiv'>" + additionalInfo.map(el => `<span style='font-weight: bold;'>${el}</span>`).join("") + "</div>";
+							+`${window.location.search ? window.location.search + "&" : "?"}noJS=true" target="_blank">Original Justel</a></b>`);
+		act.info += "<div id='addinfodiv'>" + additionalInfo.map(el => `<span>${el}</span>`).join("") + "</div>";
 	}
 
 	async function displayContent(online) {
@@ -509,7 +544,7 @@
 				if (key == "bookmarks") {
 					for (let bookmark in highlights.quotes.bookmarks) {
 						let article = $(`div#toc a:contains("${bookmark}")`)?.[0]?.id;
-						document.querySelector(`div#content div#anchor_${article.slice(0,9)}`)?.classList?.add("bookmark");
+						document.querySelector(`div#content div#anchor_${article?.slice(0,9)}`)?.classList?.add("bookmark");
 					}
 				}
 				else {
@@ -581,7 +616,7 @@
 		});
 		// Add JSTree
 		$("div#toc").append("<div id='btndiv'><button id='btnCollapse'>Collapse</button><button id='btnExpand'>Expand</button>"
-							+ `<span class="${online}">${online ? "Act loaded from Justel" : "Act restored from database"}</span></div>`);
+							+ `<span class="${online}">${online ? "Act loaded from Justel" : "Act restored"}</span></div>`);
 		$("button#btnCollapse").on("click", function (event, data) {
 			$("div#jstree").jstree("close_all")
 		});
@@ -622,6 +657,8 @@
 			await setStorage(act.eli, {});
 			updateInfo[act.eli].act = false;
 			await setStorage("updateInfo", updateInfo);
+			numac2eli[act.numac] = "";
+			await setStorage("numac2eli", numac2eli);
 			$("a#clearDB").parent().hide("slow");
 		});
 		// Change document title
@@ -832,27 +869,68 @@
 		}
 	}
 
-	// Hide table in order to accelerate dramatically loading of the DOM
+	function researchPage() {
+		// Add buttons next to Nature juridique label
+		let newDiv = document.createElement('div');
+		newDiv.style.display = "flex";
+		newDiv.style.flexDirection = "row";
+		let label = document.querySelector("label[for=juridische_aard]");
+		label.parentNode.insertBefore(newDiv, label);
+		newDiv.appendChild(label);
+		let buttonLoi = document.createElement('button');
+		buttonLoi.style.position = "relative";
+		buttonLoi.style.top = "-8px";
+		buttonLoi.style.marginLeft = "20px";
+		buttonLoi.textContent = "Loi";
+		buttonLoi.addEventListener("click", function(event) {
+			event.preventDefault();
+			document.querySelector("select#juridische_aard").value = "LOI";
+		});
+		newDiv.appendChild(buttonLoi);
+		let buttonAR = document.createElement('button');
+		buttonAR.style.position = "relative";
+		buttonAR.style.top = "-8px";
+		buttonAR.style.marginLeft = "20px";
+		buttonAR.textContent = "AR";
+		buttonAR.addEventListener("click", function(event) {
+			event.preventDefault();
+			document.querySelector("select#juridische_aard").value = "ARRETE ROYAL";
+		});
+		newDiv.appendChild(buttonAR);
+		let buttonTraite = document.createElement('button');
+		buttonTraite.style.position = "relative";
+		buttonTraite.style.top = "-8px";
+		buttonTraite.style.marginLeft = "20px";
+		buttonTraite.textContent = "Traité";
+		buttonTraite.addEventListener("click", function(event) {
+			event.preventDefault();
+			document.querySelector("select#juridische_aard").value = "TRAITE";
+		});
+		newDiv.appendChild(buttonTraite);
+		// Swap promulgation and publication fields (more logical to have promulgation first)
+		document.querySelector("div.search-form").insertBefore(
+			document.querySelector("div.search-form div:nth-of-type(6)"), 
+			document.querySelector("div.search-form div:nth-of-type(5)"));
+		// Search in title of the act by default
+		document.querySelector("input#titel").checked = true;
+	}
+
 	function processResultsPage() {
-		if (document.querySelectorAll("frame")[1]?.contentDocument?.querySelector("frame")) {
-			var forms = document.querySelectorAll("frame")[1].contentDocument.querySelector("frame").contentDocument.querySelectorAll("table form");
-			for (var i = 0; i < forms.length; i++) {
-				// En changeant la cible, on fait en sorte que chaque lien s'ouvre dans une nouvelle fenêtre
-				// en changeant la méthode de post en get, on fait en sorte que les paramètres apparaissent dans l'adresse
-				// enfin, en changeant l'action vers "loi_a1" au lieu de "loi_a", on fait en sorte que ça s'ouvre sans le footer de recherches
-				forms[i].target = "_blank";
-				forms[i].method = "get";
-				forms[i].action = "/cgi_loi/loi_a1.pl";
-			}
+		if (document.readyState == "complete") {
+			// Change target of each link to a new tab
+			document.querySelectorAll("div.list a[href]").forEach(a => a.target = "_blank");
+		}
+		else {
+			document.addEventListener("DOMContentLoaded", processResultsPage);
 		}
 	}
 
 	async function analyseAct() {
 		try {
-			$("div#loading span#msg").text("Analysing content of the act");
+			addLoading("Analysing content of the act");
 			analyseFurtherInfo();
 			analyseContent();
-			$("div#loading span#msg").text("Storing the act in offline database");
+			addLoading("Storing the act in offline database");
 			await setStorage(act.eli, act);
 			updateInfo[act.eli] =
 				{
@@ -865,11 +943,10 @@
 		}
 		catch(e) {
 			document.querySelector("div#loading").innerHTML = `Error while loading, click <a href=${window.location.origin + window.location.pathname}`
-				+`${window.location.search ? window.location.search + "&" : "?"}noJS=true>here</a> to disable javascript`;
+				+`${window.location.search ? window.location.search + "&" : "?"}noJS=true>here</a> to disable the extension or reload the page`;
 			console.error(e.message);
-			return;
+			throw e;
 		}
-		await displayContent(true);
 	}
 
 	async function runDropboxBackup() {
@@ -916,10 +993,17 @@
 	}
 
 	function addLoading(msg) {
-		$("body").prepend(`<div id='loading'><div class="loadingio-spinner-spinner-is7uuvdj549"><div class="ldio-zrg2ss6p6ee">`
-						 +`<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>`
-						 +`<div></div><div></div><div></div></div></div><span id='msg'>${msg}</span></div>`);
+		if(!document.querySelector("div#loading")) {
+			$("head").append("<style>div.page, div.page__wrapper--content, footer {display: none;}</style>");			
+			$("body").prepend(`<div id='loading'><div class="loadingio-spinner-spinner-is7uuvdj549"><div class="ldio-zrg2ss6p6ee">`
+				+`<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>`
+				+`<div></div><div></div><div></div></div></div><span id='msg'>${msg}</span></div>`);
+		}
+		else {
+			document.querySelector("div#loading span#msg").textContent = msg;
+		}
 	}
+	
 	async function main() {
 		// Identify act
 		await analyseFirstInfo();
@@ -938,27 +1022,41 @@
 			window.stop();
 			addLoading("Restoring page from offline database");
 			act = await getStorage(act.eli);
-			displayContent(false);
+			await displayContent(false);
 		}
 		else {
 			// Online mode
 			// Page must be loaded and analysed since it cannot be restored
-			addLoading("Downloading page from eJustice server");
+			addLoading("Loading page from Justel server");
 			if (document.readyState == "complete") {
 				await analyseAct();
+				await displayContent(true);
 			}
 			else {
-				// console.log("Waiting for loading of the page");
-				document.addEventListener("DOMContentLoaded", analyseAct);
+				document.addEventListener("DOMContentLoaded", async () => {
+					await analyseAct();
+					await displayContent(true);
+				});
 			}
 		}
 	}
 	
 	// Start of the script
 	highlightsBackup = await getStorage("highlightsBackup") || {};
-	if ( window.location.href == "https://www.ejustice.just.fgov.be/loi/loi.htm" ) {
+	numac2eli = await getStorage("numac2eli") || {};
+	let u = new URLSearchParams(window.location.search);
+	if (u.get("arch") || u.get("noJS")) {
+		// Disable extension if archive page or user clicked on "Original Justel"
+		return
+	}
+	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/rech.pl" ) {
 		// Main search page
-		document.querySelectorAll("frame")[1].addEventListener("load", processResultsPage, false);
+		researchPage();
+	}
+	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/rech_res.pl"
+		|| (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/list.pl" ) {
+		// Main search page
+		processResultsPage();
 	}
 	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/eli/" ) {
 		// ELI about page
@@ -996,7 +1094,7 @@
 			addLoading("Restoring page from offline database");
 			act = await getStorage(eli);
 			if (act) {
-				displayContent(false);
+				await displayContent(false);
 			}
 			else {
 				document.write(`Error, ${eli} has not been stored in the offline database`);
@@ -1005,9 +1103,6 @@
 	}
 	else {
 		// Specific statute page
-		let u = new URLSearchParams(window.location.search);
-		if (!u.get("noJS")) {
-			main();
-		}
+		main();
 	}
 })();

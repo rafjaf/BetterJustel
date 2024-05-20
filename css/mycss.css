@@ -1,19 +1,22 @@
 body {
 	background-color: #F5F5FE;
-	font-variant: normal;
-	font-size: medium;
-	font-family: Times;
+	font-size: 1rem!important;
+	color: black!important;
+	line-height: 1.2em!important;
 }
 
-body > table {display: none;}
-
 div#loading {
+	position: absolute;
 	display: flex;
 	flex-direction: column;
 	width: 100%;
 	height: 100%;
 	justify-content: center;
 	align-items: center;
+}
+
+div#loading a {
+	color: cornflowerblue;
 }
 
 @keyframes ldio-zrg2ss6p6ee {
@@ -114,14 +117,35 @@ div#info {
 	padding-left: 10px;
 	width: 100%;
 	height: 150px;
-}
-
-div#info div#addinfodiv {
+	font-size: 1.1rem;
 	margin-top: 10px;
 }
 
-div#info span {
-	margin-left: 20px;
+div#info p.list-item--title span.title {
+	font-weight: bold;
+	color: orange;
+}
+
+div#info p.list-item--title span.update {
+	font-weight: bold;
+	color: red;
+}
+
+div#info p.list-item--title, div#info div.plain-text, div#info div#addinfodiv {
+	margin-right: 250px;
+}
+
+div#info div.plain-text {
+	margin-top: 5px;
+}
+
+div#info div#addinfodiv {
+	margin-top: 5px;
+	color: cornflowerblue;
+}
+
+div#info div.plain-text span, div#info div#addinfodiv span {
+	margin-right: 20px;
 }
 
 div#info a {
@@ -129,9 +153,9 @@ div#info a {
 }
 
 div#info a#btnSavePDF {
+	display: inline-block;
 	position: relative;
-	margin-left: 10px;
-	top: 4px;
+	top: 2px;
 }
 
 div#hsplit {
@@ -159,7 +183,10 @@ div#toc div#btndiv {
 	margin-bottom: 10px;
 }
 div#toc button {
-	margin-left: 20px;
+	margin-left: 15px;
+	border-radius: 8px;
+	background-color: lightgrey;
+	padding: 5px;
 }
 div#toc div#btndiv span {
 	padding-left: 20px; 
@@ -196,6 +223,7 @@ div#content div.level1 {
 	font-size: 24px;
 	color: blue;
 	font-weight: bold;
+	line-height: 1.2em;
 }
 
 div#content div.level2 {
@@ -203,6 +231,7 @@ div#content div.level2 {
 	color: red;
 	font-weight: bold;
 	margin-left: 20px;
+	line-height: 1.2em;
 }
 
 div#content div.level3 {
@@ -210,6 +239,7 @@ div#content div.level3 {
 	color: green;
 	font-weight: bold;
 	margin-left: 40px;
+	line-height: 1.2em;
 }
 
 div#content div.level4 {
@@ -217,6 +247,7 @@ div#content div.level4 {
 	color: cornflowerblue;
 	font-weight: bold;
 	margin-left: 60px;
+	line-height: 1.2em;
 }
 
 div#content div.level5 {
@@ -231,6 +262,7 @@ div#content div.level6 {
 	color: darkcyan;
 	font-weight: bold;
 	margin-left: 100px;
+	line-height: 1.2em;
 }
 
 div#content div.level7 {
@@ -238,6 +270,7 @@ div#content div.level7 {
 	color: deeppink;
 	font-weight: bold;
 	margin-left: 120px;
+	line-height: 1.2em;
 }
 
 div#content div.article {
@@ -261,8 +294,8 @@ div#content div.nostyle {
 
 div#toolbar {
 	border: 1px solid grey;
-	width: 195px;
-	height: 26px;
+	width: 185px;
+	height: 32px;
 	padding: 5px;
 	position: absolute;
 	background: white;
@@ -394,6 +427,7 @@ div#bookmark-bar {
 	padding: 5px;
 	overflow: auto;
 	max-height: 300px;
+	/* font-size: 0.8rem; */
 }
 div#bookmark-bar div#minmax {
 	float: right;
@@ -411,7 +445,8 @@ div#bookmark-bar div#title {
 }
 
 div#bookmark-bar div#items div {
-	padding: 3px;
+	padding-left: 3px;
+	padding-top: 1px;
     margin: 4px 0;
     background-color: #FFFFFF;
     border-radius: 4px;

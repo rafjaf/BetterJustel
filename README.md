@@ -66,3 +66,4 @@ It makes use of the following open source libraries :
 - Version 0.1.2023.1116 : improvement of CSS (position of bookmark star)
 - Versoin 0.1.2023.1118 : adds a possibility to remove a bookmark directly from the bookmark bar by clicking on the star next to the bookmark
 - Version 0.1.2023.1209 : solves a bug which prevented saving highlights or bookmars pertaining to an article which was not displayed in the TOC because it was collapsed
+- Version 0.2.2024.0518 : update to the new version of Justel and multiple improvements and correction of bugs
