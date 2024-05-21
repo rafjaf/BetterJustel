@@ -22,7 +22,7 @@
     "default_popup": "html/popup.html"
   },
   "background": {
-	  "scripts": "scripts/background.js"
+	  "scripts": ["scripts/background.js"]
   },
   "content_scripts": [
     {
@@ -71,5 +71,10 @@
 		"https://www.ejustice.just.fgov.be/*"
 	  ]
     }
-  ]
+  ],
+  "browser_specific_settings": {
+	"gecko": {
+		"id": "{b10df66f-7b07-4f1d-b6f4-1c7cd883d8b7}"
+	}
+  }
 }
