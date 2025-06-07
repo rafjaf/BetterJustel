@@ -338,12 +338,22 @@
 						// Test if a heading was erroneously inserted as the end of an article (wrong subdivision)
 						if ( (text.trim()[0] != "§")
 							&& ( n.nextSibling?.nextSibling?.nodeName == "BR" )
-							&& ( HEADINGS_TYPE.some(el => text.toLowerCase().trim().startsWith(el)) ) ) {
-							// This is a heading hidden in the article content
-							lastNode.content += "<br><br>";
-							beautify(lastNode);
-							n.textContent = n.textContent.trim();
-							analyseHeading(n);
+							&& ( HEADINGS_TYPE.some(el => text.toLowerCase().trim().startsWith(el)) )
+						) {
+							// This may be a heading hidden in the article content
+							console.log(`Hidden heading possibly found: ${text}`);
+							if ( text.split(" ")?.[1].match(/^[\dIVXL]+\./) ) { // Avoid recognising as heading something like "partie concernée"
+								console.log("Added as heading");
+								lastNode.content += "<br><br>";
+								beautify(lastNode);
+								n.textContent = n.textContent.trim();
+								analyseHeading(n);
+							}
+							else {
+								// This is ordinary text to be added to the content of the article
+								console.log("No heading after all")
+								lastNode.content += n.textContent.replace(/</g, "&lt;");
+							}
 						}
 						else {
 							// This is ordinary text to be added to the content of the article
@@ -353,7 +363,7 @@
 				}
 				else {
 					// Last node was a heading
-					// Test if a heading was erroneously inserted as the content of an heading title (wrong subdivision)
+					// Test if a heading was erroneously inserted as the content of a heading title (wrong subdivision)
 					let m = text.match(/[\w\-]+\s\d(\w+)?\.\s.+/);
 					if (m && HEADINGS_TYPE.some(el => m[0].toLowerCase().startsWith(el))) {
 						// There are two titles hidden in this heading
@@ -1045,9 +1055,9 @@
 	highlightsBackup = await getStorage("highlightsBackup") || {};
 	numac2eli = await getStorage("numac2eli") || {};
 	let u = new URLSearchParams(window.location.search);
-	if (u.get("arch") || u.get("noJS")) {
-		// Disable extension if archive page or user clicked on "Original Justel"
-		return
+	if (u.get("arrexec") || u.get("arch") || u.get("noJS")) {
+		// Disable extension if royal decrees page, archive page or user clicked on "Original Justel"
+		return;
 	}
 	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/rech.pl" ) {
 		// Main search page
