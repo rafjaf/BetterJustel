@@ -4,19 +4,35 @@ const DROPBOX_REDIRECT_URL = "https://www.ejustice.just.fgov.be/eli/";
 import {getStorage, setStorage, getAllHighlights} from "../scripts/util.js";
 
 async function importHighlights() {
-	// Input box to import highlights
-	let input = prompt("Please paste highlights to be imported");
-	// Verifications
-	if (!input) {return;}
-	let inputObj
+	// Let the user pick a JSON file instead of pasting raw JSON
+	const fileList = await new Promise(resolve => {
+		const el = document.createElement('input');
+		el.type = 'file';
+		el.accept = '.json,application/json';
+		el.style.display = 'none';
+		document.body.appendChild(el);
+		el.addEventListener('change', () => resolve(el.files), { once: true });
+		el.click();
+	});
+	const file = fileList && fileList[0];
+	if (!file) { return; }
+	let text;
 	try {
-		inputObj = JSON.parse(input);
+		text = await file.text();
 	}
-	catch(e) {
-		alert("Invalid JSON");
+	catch (e) {
+		alert('Unable to read file');
 		return;
 	}
-	// Save imported highlights
+	let inputObj;
+	try {
+		inputObj = JSON.parse(text);
+	}
+	catch(e) {
+		alert("Invalid JSON file");
+		return;
+	}
+	// Save imported highlights (same behaviour as before)
 	let counter = 0;
 	for (const key in inputObj) {
 		if (key.startsWith("highlights-")) {
@@ -24,7 +40,6 @@ async function importHighlights() {
 			counter += 1;
 		}
 	}
-	// Save new highlights
 	alert(`Imported highlights for ${counter} acts`);
 }
 

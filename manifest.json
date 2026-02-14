@@ -31,14 +31,21 @@
 		"css/mycss.css"
       ],
       "js": [
-		"scripts/download.js",
-		"scripts/Dropbox-sdk.min.js",
-		"scripts/jquery.min.js",
-		"scripts/jquery-ui.min.js",
-		"scripts/jquery-resizable.min.js",
-		"scripts/jstree.min.js",
-		"scripts/standalone-anchoring.js",
-		"scripts/content.js"
+		    "scripts/lib/download.js",
+		    "scripts/lib/Dropbox-sdk.min.js",
+		    "scripts/lib/jquery.min.js",
+		    "scripts/lib/jquery-ui.min.js",
+		    "scripts/lib/jquery-resizable.min.js",
+		    "scripts/lib/jstree.min.js",
+		    "scripts/lib/standalone-anchoring.js",
+		    "scripts/content-helpers.js",
+		    "scripts/content-analyse.js",
+		    "scripts/content-info.js",
+		    "scripts/content-display.js",
+		    "scripts/content-highlights.js",
+		    "scripts/content-dropbox.js",
+		    "scripts/content-search.js",
+		    "scripts/content.js"
       ],
       "matches": [
         "https://www.ejustice.just.fgov.be/cgi_loi/loi_a1.pl*",

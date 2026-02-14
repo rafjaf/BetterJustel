@@ -84,3 +84,6 @@ It makes use of the following open source libraries :
 	- fixed intermittent error with bookmark bar draggable functionality
 	- extended indentation support for double-letter list items (e.g. aa), bb)) to be indented at the same level as single-letter items (e.g. z))
 	- fixed some offline layout differences: added global box-sizing, system font family, and viewport meta tag to match online rendering
+	- file system dialog box to import highlights
+	- content.js split in several smaller files for better readability
+	
