@@ -86,4 +86,4 @@ It makes use of the following open source libraries :
 	- fixed some offline layout differences: added global box-sizing, system font family, and viewport meta tag to match online rendering
 	- file system dialog box to import highlights
 	- content.js split in several smaller files for better readability
-	
+- Version 0.3.2026.0215 : fixing issues https://github.com/rafjaf/BetterJustel/issues/3

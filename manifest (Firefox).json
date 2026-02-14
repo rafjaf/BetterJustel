@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Better Justel",
   "description": "Improves Belgian eJustice Justel website",
-  "version": "0.3.2026.214",
+  "version": "0.3.2026.215",
   "icons": {
     "16": "images/justice_scales_16.png",
     "32": "images/justice_scales_32.png",
@@ -48,11 +48,11 @@
 		    "scripts/content.js"
       ],
       "matches": [
-        "https://www.ejustice.just.fgov.be/cgi_loi/loi_a1.pl*",
-        "https://www.ejustice.just.fgov.be/cgi_loi/article.pl*",
-        "https://www.ejustice.just.fgov.be/cgi_loi/rech.pl*",
-        "https://www.ejustice.just.fgov.be/cgi_loi/rech_res.pl*",
-        "https://www.ejustice.just.fgov.be/cgi_loi/list.pl*",
+        "https://www.ejustice.just.fgov.be/cgi_*/loi_a1.pl*",
+        "https://www.ejustice.just.fgov.be/cgi_*/article.pl*",
+        "https://www.ejustice.just.fgov.be/cgi_*/rech.pl*",
+        "https://www.ejustice.just.fgov.be/cgi_*/rech_res.pl*",
+        "https://www.ejustice.just.fgov.be/cgi_*/list.pl*",
         "https://www.ejustice.just.fgov.be/eli/*",
         "https://www.ejustice.just.fgov.be/loi/loi.htm*"
       ],

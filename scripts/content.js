@@ -71,7 +71,7 @@
 		await analyseFirstInfo();
 		// If URL is not ELI, redirect to ELI
 		if ( ((window.location.origin + window.location.pathname) != ctx.act.eli)
-			 && (ctx.act.eli.indexOf("cgi_loi") == -1) ) {
+				 && (ctx.act.eli.indexOf("cgi_") == -1) ) {
 			window.location.href = ctx.act.eli;
 			return;
 		}
@@ -111,13 +111,12 @@
 		// Disable extension if royal decrees page, archive page, user clicked on "Original Justel", or non-French version
 		return;
 	}
-	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/rech.pl" ) {
+	else if ( window.location.pathname.startsWith("/cgi_") && window.location.pathname.endsWith("/rech.pl") ) {
 		// Main search page
 		researchPage();
 	}
-	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/rech_res.pl"
-		|| (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/list.pl" ) {
-		// Main search page
+	else if ( window.location.pathname.startsWith("/cgi_") && (window.location.pathname.endsWith("/rech_res.pl") || window.location.pathname.endsWith("/list.pl")) ) {
+		// Search results / list page
 		processResultsPage();
 	}
 	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/eli/" ) {
