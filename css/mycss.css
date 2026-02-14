@@ -1,8 +1,14 @@
+*, ::before, ::after {
+	box-sizing: border-box;
+}
+
 body {
 	background-color: #F5F5FE;
 	font-size: 1rem!important;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 	color: black!important;
 	line-height: 1.2em!important;
+	margin: 0;
 }
 
 div#loading {

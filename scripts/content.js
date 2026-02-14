@@ -157,7 +157,7 @@
 			// Sanitize text of the node
 			n.text = n.text.replace(/[\[\]]|[\(\)]|--+/g, "").replace(/\s\s/g, " ")
 				.replace(/(\d+(er)?\.)([A-Z])/g, "$1 $3");
-			const ARTICLE_REGEX = /Art(\.|icle)\s?[LR]?([IVX]+|\d+(\w+)?)((\.|\/|:|-)\d+)?((\.|\/|:|-)\d+)?\.(.+[a-zéè]$)?/
+			const ARTICLE_REGEX = /Art(\.|icle)\s?[LR]?([IVX]+|\d+(\w+)?)((\.|\/|:|-)\d+)?((\.|\/|:|-)\d+)?\.(.+[a-zéèA-Z]$)?/
 			let m = n.text.match(ARTICLE_REGEX);
 			if (m) { n.text = m[0]; }
 			// Rules depending on node type
@@ -193,6 +193,53 @@
 					if ( t > -1 ) {
 						contentIndent[i].numbering = content[i].match(INDENT_TYPE[t])[0];
 						content[i] = content[i].replace(INDENT_TYPE[t], "<b>$&</b>");
+					}
+				}
+				// Post-processing: reclassify lone i), v), x) as letters instead of roman numerals
+				// i) is roman only if followed by ii); v) is roman only if preceded by iv); x) is roman only if preceded by ix)
+				for (let i = 0; i < content.length; i++) {
+					if (contentIndent[i].type == 4) {
+						let num = contentIndent[i].numbering.replace(/<[^>]+>/g, "").trim();
+						let isLoneRoman = false;
+						if (num.match(/^i[).]/i) && !num.match(/^i[ivx]/i)) {
+							// i) is roman only if followed by ii)
+							let hasFollowup = false;
+							for (let j = i + 1; j < content.length; j++) {
+								if (contentIndent[j].type == 4) {
+									let n2 = contentIndent[j].numbering.replace(/<[^>]+>/g, "").trim();
+									if (n2.match(/^ii[).]/i)) { hasFollowup = true; }
+									break;
+								}
+							}
+							if (!hasFollowup) isLoneRoman = true;
+						}
+						else if (num.match(/^v[).]/i) && !num.match(/^vi/i)) {
+							// v) is roman only if preceded by iv)
+							let hasPreceding = false;
+							for (let j = i - 1; j >= 0; j--) {
+								if (contentIndent[j].type == 4) {
+									let n2 = contentIndent[j].numbering.replace(/<[^>]+>/g, "").trim();
+									if (n2.match(/^iv[).]/i)) { hasPreceding = true; }
+									break;
+								}
+							}
+							if (!hasPreceding) isLoneRoman = true;
+						}
+						else if (num.match(/^x[).]/i) && !num.match(/^x[ivxlc]/i)) {
+							// x) is roman only if preceded by ix)
+							let hasPreceding = false;
+							for (let j = i - 1; j >= 0; j--) {
+								if (contentIndent[j].type == 4) {
+									let n2 = contentIndent[j].numbering.replace(/<[^>]+>/g, "").trim();
+									if (n2.match(/^ix[).]/i)) { hasPreceding = true; }
+									break;
+								}
+							}
+							if (!hasPreceding) isLoneRoman = true;
+						}
+						if (isLoneRoman) {
+							contentIndent[i].type = 3; // Reclassify as letter
+						}
 					}
 				}
 				// Second loop:
@@ -271,7 +318,7 @@
 		document.querySelector("div#list-title-3 h2").remove();
 		let contentNodes = Array.from(document.querySelector("div#list-title-3").childNodes);
 		// Also correct p elements which contain articles 
-		const WRONG_LAST_NODENAME = ["ERRATUM,M.B.", "I", "BR&GT;<BR", "L", "P"];
+		const WRONG_LAST_NODENAME = ["ERRATUM,M.B.", "I", "BR&GT;<BR", "L", "P", "AR"];
 		let i = 0;
 		do {
 			// Using do ... while instead of forEach because the number of the elements of the array is affected by the loop
@@ -365,7 +412,7 @@
 					// Last node was a heading
 					// Test if a heading was erroneously inserted as the content of a heading title (wrong subdivision)
 					let m = text.match(/[\w\-]+\s\d(\w+)?\.\s.+/);
-					if (m && HEADINGS_TYPE.some(el => m[0].toLowerCase().startsWith(el))) {
+					if (m && m.index > 0 && HEADINGS_TYPE.some(el => m[0].toLowerCase().startsWith(el))) {
 						// There are two titles hidden in this heading
 						let node = {};
 						lastNode.text += " " + text.slice(0, m.index - 1);
@@ -536,6 +583,11 @@
 		if (document.querySelector("div.external-links")) {
 			document.querySelectorAll("div.external-links a").forEach(a => additionalInfo.push(a.outerHTML));
 		}
+		// Dutch version link
+		let nlLink = Array.from(document.querySelectorAll("nav a")).find(a => a.textContent.trim() === "NL")?.href;
+		if (nlLink) {
+			additionalInfo.push(`<a href='${nlLink}' target="_blank">NL</a>`);
+		}
 		additionalInfo.push(`<a id='clearDB' href='#'>Clear storage</a>`);
 		additionalInfo.push(`<a href="${window.location.origin + window.location.pathname}`
 							+`${window.location.search ? window.location.search + "&" : "?"}noJS=true" target="_blank">Original Justel</a></b>`);
@@ -674,7 +726,7 @@
 		// Change document title
 		document.querySelector("head > title").text = act.fullTitle;
 		// Set up bookmark bar
-		$("div#bookmark-bar").draggable();
+		try { $("div#bookmark-bar").draggable(); } catch(e) { console.warn("draggable not available:", e.message); }
 		$("div#bookmark-bar div#items div").on('mousedown', function(e) {
 			e.stopPropagation(); // Prevents the mousedown event from reaching the parent
 		});
@@ -693,6 +745,16 @@
 					break;
 				case "item":
 					$("div#" + e.target.getAttribute("target"))[0].scrollIntoView(true);
+					// Also expand and scroll to the relevant article in the TOC
+					let nodeId = e.target.getAttribute("target").replace("anchor_", "");
+					let jstreeInst = $("div#jstree").jstree(true);
+					if (jstreeInst) {
+						jstreeInst.deselect_all(true);
+						jstreeInst.open_node(jstreeInst.get_parent(nodeId));
+						jstreeInst.select_node(nodeId, true);
+						let tocNode = document.getElementById(nodeId + "_anchor") || document.getElementById(nodeId);
+						if (tocNode) { tocNode.scrollIntoView({block: "center"}); }
+					}
 					break;
 			}
 		})
@@ -1055,8 +1117,8 @@
 	highlightsBackup = await getStorage("highlightsBackup") || {};
 	numac2eli = await getStorage("numac2eli") || {};
 	let u = new URLSearchParams(window.location.search);
-	if (u.get("arrexec") || u.get("arch") || u.get("noJS")) {
-		// Disable extension if royal decrees page, archive page or user clicked on "Original Justel"
+	if (u.get("arrexec") || u.get("arch") || u.get("noJS") || (u.get("language") && u.get("language") != "fr")) {
+		// Disable extension if royal decrees page, archive page, user clicked on "Original Justel", or non-French version
 		return;
 	}
 	else if ( (window.location.origin + window.location.pathname) == "https://www.ejustice.just.fgov.be/cgi_loi/rech.pl" ) {

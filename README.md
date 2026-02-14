@@ -1,4 +1,4 @@
-# Better Juportal
+# Better Justel
 
 ## Concept
 
@@ -72,3 +72,15 @@ It makes use of the following open source libraries :
 - Version 0.2.2025.0525 :
 	- improved parsing of headings (notably for the Code of Economic Law) : avoid recognising as heading something which looks like a heading (e.g. starting with "partie") but not followed by an ordinal or roman numeral
 	- disables extension on page listing acts (generally royal decrees) adopted in execution of an article
+- Version 0.3.2026.0214 :
+	- fixed parsing of acts containing certain malformed HTML elements (e.g. `<AR>` tags) that caused content to be cut off (e.g. Code de la route)
+	- some article titles in upper cases (e.g. "CHAMP D'APPLICATION." for Art. 1) are now shown in the TOC
+	- fixed a bug causing articles to be incorrectly displayed as headings (wrong styling) due to an erroneous two-titles-in-one-heading detection when text from abrogated italic sections was parsed
+	- improved indentation algorithm: i), v) and x) are no longer incorrectly treated as roman numerals when they are actually letters in alphabetical lists (e.g. law of 18 December 2017, art. 4, 23°)
+	- added a button to display the Dutch version of the text in the info pane
+	- the extension is now disabled on the Dutch version of Justel (to avoid interfering with it)
+	- fixed highlights and bookmarks not working in offline mode (missing jQuery UI dependency in offline page)
+	- clicking a bookmark now also expands and scrolls to the relevant article in the TOC
+	- fixed intermittent error with bookmark bar draggable functionality
+	- extended indentation support for double-letter list items (e.g. aa), bb)) to be indented at the same level as single-letter items (e.g. z))
+	- fixed some offline layout differences: added global box-sizing, system font family, and viewport meta tag to match online rendering
