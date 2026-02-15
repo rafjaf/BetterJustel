@@ -1,0 +1,17 @@
+# Files ignored for the build of the extension
+.packageignore
+README.md
+.git/
+.github/
+.vscode/
+node_modules/
+dist/
+build/
+*.map
+.DS_Store
+*.zip
+manifest.json
+manifest.chrome.json
+manifest.firefox.json
+LICENSE
+doc/
