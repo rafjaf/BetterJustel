@@ -20,9 +20,31 @@ window.BJ.infoModule = function(ctx) {
 			// We must wait for the full page to load (eli should be at the end)
 			ctx.addLoading("Loading page from Justel server");
 			ctx.act.eli = document.querySelector("a#link-text")?.href;
-			while ( !ctx.act.eli && (document.readyState != "complete") ) {
+			let _loadWaitMs = 0;
+			while (!ctx.act.eli) {
 				await ctx.delay(500);
+				_loadWaitMs += 500;
 				ctx.act.eli = document.querySelector("a#link-text")?.href;
+				if (ctx.act.eli) break;
+				// Exit if the page is fully loaded and we have given it a 2-second grace period
+				// (handles non-ELI pages where a#link-text genuinely never appears)
+				if (document.readyState === "complete" && _loadWaitMs >= 2000) {
+					console.log(`[Better Justel] Page fully loaded after ${_loadWaitMs / 1000}s, ELI not found  — treating as non-ELI page.`);
+					break;
+				}
+				if (_loadWaitMs % 5000 === 0) {
+					console.warn(`[Better Justel] Still waiting for ELI link after ${_loadWaitMs / 1000}s (readyState: "${document.readyState}")`);
+				}
+				if (_loadWaitMs === 20000) {
+					console.error("[Better Justel] Page appears stuck. Offering reload to user.");
+					ctx.addLoading("Loading page from Justel server"
+						+ " &mdash; the server is taking a long time."
+						+ " <a href='javascript:window.location.reload()'>Reload</a>");
+				}
+				if (_loadWaitMs >= 60000) {
+					console.error(`[Better Justel] Timeout after ${_loadWaitMs / 1000}s waiting for ELI — giving up.`);
+					break;
+				}
 			}
 			if (!ctx.act.eli) {
 				// eli cannot be determined, used numac instead

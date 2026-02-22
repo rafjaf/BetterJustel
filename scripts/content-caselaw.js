@@ -231,12 +231,22 @@ window.BJ.caselawModule = function(ctx) {
 	}
 
 	/**
-	 * Extract article number from the article text used in ctx.act (e.g. "Art. 10" → "10", "Art. 1382bis" → "1382bis").
+	 * Extract article number from the article text used in ctx.act.
+	 * Handles all formats found in Belgian codes:
+	 *   "Art. 10"     → "10"
+	 *   "Art. 1382bis" → "1382bis"
+	 *   "Art. XX.193"  → "XX.193"   (Code de droit économique)
+	 *   "Art. L1131-1" → "L1131-1"  (Code de la démocratie locale)
+	 *   "Art. I"       → "I"
+	 * Uses the same greedy-after-Art strategy as the Juportal Crawler.
 	 */
 	function extractArticleNumber(text) {
 		if (!text) return null;
-		const m = text.match(/Art(?:\.|icle)\s*L?R?([IVX]+|\d+(?:\w*)?(?:[.\/:-]\d+)*)/i);
-		return m ? m[1] : null;
+		// Capture everything after "Art."/"Article" up to the first whitespace or punctuation
+		const m = text.match(/Art(?:\.|icle)\s{0,3}([^\s,;()[\]{}<>]+)/i);
+		if (!m) return null;
+		// Strip trailing period (e.g. "10." → "10")
+		return m[1].replace(/\.$/, "");
 	}
 
 	/**

@@ -529,6 +529,10 @@ div.caselaw-content ol {
 	padding-left: 20px;
 }
 
+div.caselaw-content ol {
+	list-style-type: decimal;
+}
+
 div.caselaw-content li {
 	margin-bottom: 8px;
 	text-align: justify;
