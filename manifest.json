@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Better Justel",
   "description": "Improves Belgian eJustice Justel website",
-  "version": "0.3.2026.0215",
+  "version": "0.4.0",
   "icons": {
     "16": "images/justice_scales_16.png",
     "32": "images/justice_scales_32.png",

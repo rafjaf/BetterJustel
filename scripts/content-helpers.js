@@ -6,18 +6,23 @@ window.BJ.helpersModule = function() {
     }
 
 	function showStatusMessage(msg) {
-		// Create the popup element
-		const popup = document.getElementById('status');
-		popup.innerHTML = msg;
+		const container = document.getElementById('status');
+		const item = document.createElement('div');
+		item.classList.add('status-item');
+		item.innerHTML = msg;
+		container.appendChild(item);
 
-		// Show the popup
-		popup.style.transform = 'translateY(0)';
-		popup.style.opacity = '1';
+		// Trigger slide-in after two animation frames so the transition fires
+		requestAnimationFrame(() => requestAnimationFrame(() => {
+			item.style.transform = 'translateY(0)';
+			item.style.opacity = '1';
+		}));
 
-		// After 5 seconds, hide the popup
+		// After 10 seconds, fade out and remove
 		setTimeout(() => {
-			popup.style.transform = 'translateY(100%)';
-			popup.style.opacity = '0';
+			item.style.transform = 'translateY(100%)';
+			item.style.opacity = '0';
+			setTimeout(() => item.remove(), 1000);
 		}, 10000);
 	}
 

@@ -22,6 +22,10 @@ IMPORTANCE NOTICE: If you are using the Firefox extension, the first time you wi
 - Highlights are stored in the local storage of the browser and are restored the next time the same act is displayed. Saved highlights can be managed with the commands available in the popup window shown when clicking on the icon of the extension. They can be exported in JSON format and imported again by pasting the content of the JSON file in the relevant input box. A daily backup to Dropbox can also be set up (access is limited to the app folder in Dropbox, no access to the rest of the Dropbox is granted).
 - Acts displayed are automatically stored in the browser local storage. When visited again, the act loads much quicker (which is useful for very long texts such as the Code of Economic Law), unless it has been updated in the online database in the meanwhile. Stored acts can also be consulted offline: when no internet access is available, a user browsing to the ELI URL of a stored act will automatically be redirected to the offline version of it. The online or offline character of the text displayed is mentioned on top of the left pane. The list of stored acts can also be consulted by clicking on the icon of the extension (they are listed in chronological order). Highlights are also displayed and are editable when in offline mode.
 
+## Terms and conditions
+
+The use of this extension is governed by the [GNU General Public License](LICENSE) and the laws of Belgium. Any dispute pertaining to this extension shall be exclusively submitted to the courts of Brussels (Belgium).
+
 ## Known bugs and limitations
 
 - For the time being, the extension only works with the French version of Justel, to the exclusion of the Dutch version.
@@ -87,3 +91,4 @@ It makes use of the following open source libraries :
 	- file system dialog box to import highlights
 	- content.js split in several smaller files for better readability
 - Version 0.3.2026.0215 : fixing issue https://github.com/rafjaf/BetterJustel/issues/3
+- Version 0.4 : implementation of case law abstracts under each article, downloaded from [Juportal Crawaler database](https://github.com/rafjaf/juportal_crawler/tree/main/data)

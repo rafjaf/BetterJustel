@@ -35,7 +35,28 @@ window.BJ.infoModule = function(ctx) {
 		}
 		// Get act type, date and title
 		if (ctx.act.type == "traité") {
-			 ctx.act.date = ctx.act.numac.slice(0,4) + "-" + ctx.act.numac.slice(4,6) + "-" + ctx.act.numac.slice(6,8);
+			// Treaties may have letters in the numac (e.g. 2007A15042), so positional slicing is unreliable.
+			// Try to extract the date from "Dossier numéro" / "Dossiernummer" in the info section.
+			const plainText = document.querySelector("div#list-title-1 div.plain-text")?.textContent || "";
+			const dossierMatch = plainText.match(/Dossier\s*num[ée]ro\s*[:/]\s*(\d{4}-\d{2}-\d{2})/i)
+				|| plainText.match(/Dossiernummer\s*[:/]\s*(\d{4}-\d{2}-\d{2})/i);
+			if (dossierMatch) {
+				ctx.act.date = dossierMatch[1];
+			} else {
+				// Fallback: extract date from the title text (e.g. "22 NOVEMBRE 1984")
+				const MONTHS_UC = {JANVIER:"01",FEVRIER:"02",MARS:"03",AVRIL:"04",MAI:"05",JUIN:"06",
+					JUILLET:"07",AOUT:"08",SEPTEMBRE:"09",OCTOBRE:"10",NOVEMBRE:"11",DECEMBRE:"12"};
+				const titleText = document.querySelector("div#list-title-1 p.list-item--title")?.textContent || "";
+				const dateMatch = titleText.match(/(\d{1,2})\s+(JANVIER|FEVRIER|MARS|AVRIL|MAI|JUIN|JUILLET|AOUT|SEPTEMBRE|OCTOBRE|NOVEMBRE|DECEMBRE)\s+(\d{4})/i);
+				if (dateMatch) {
+					ctx.act.date = `${dateMatch[3]}-${MONTHS_UC[dateMatch[2].toUpperCase()]}-${dateMatch[1].padStart(2, "0")}`;
+				} else {
+					// Ultimate fallback: strip non-digits from numac and try positional slicing
+					const digits = ctx.act.numac.replace(/[^0-9]/g, "");
+					ctx.act.date = digits.slice(0,4) + "-" + digits.slice(4,6) + "-" + digits.slice(6,8);
+				}
+			}
+			console.log(`[Better Justel] Treaty date resolved: ${ctx.act.date} (numac: ${ctx.act.numac})`);
 		}
 		else {
 			ctx.act.type = ctx.act.eli.split("/")[4];
@@ -44,7 +65,9 @@ window.BJ.infoModule = function(ctx) {
 		let title = document.querySelector("div#list-title-1 p.list-item--title")
 			.textContent.replace(/\(.+/, "")
 			.split("-").slice(1).join("-").trim().split(" ");
-		if (title[0] != "CODE") {
+		if (title[0] != "CODE" && ctx.act.type != "traité") {
+			// Remove the first word only for regular acts (it repeats the act type, e.g. "Loi")
+			// For treaties the first word is part of the actual title (e.g. "Protocole")
 			title = title.slice(1);
 		}
 		title = title.join(" ");

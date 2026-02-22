@@ -9,6 +9,44 @@ window.BJ.caselawModule = function(ctx) {
 		"juillet", "août", "septembre", "octobre", "novembre", "décembre"
 	];
 
+	/** Map raw court identifiers from Juportal to display abbreviations. */
+	const COURT_ABBR_MAP = {
+		"CASS": "Cass.",
+		"CC":   "C.C.",
+		"CE":   "C.E.",
+	};
+
+	/**
+	 * Deduplicate near-identical abstracts.
+	 * Some abstracts differ only by a stray footnote digit or trivial whitespace;
+	 * a plain Set() won't catch those.
+	 */
+	function deduplicateAbstracts(abstracts) {
+		const normalize = s => s.replace(/\s+/g, " ").trim();
+		const result = [];
+		for (const a of abstracts) {
+			const na = normalize(a);
+			let dominated = false;
+			for (const r of result) {
+				const nr = normalize(r);
+				if (na === nr) { dominated = true; break; }
+				// Check similarity: common prefix + suffix should cover >95% of the longer string
+				const maxLen = Math.max(na.length, nr.length);
+				if (maxLen === 0) { dominated = true; break; }
+				const diff = Math.abs(na.length - nr.length);
+				if (diff / maxLen > 0.03) continue; // >3% length difference → not near-identical
+				let prefixLen = 0;
+				while (prefixLen < Math.min(na.length, nr.length) && na[prefixLen] === nr[prefixLen]) prefixLen++;
+				let suffixLen = 0;
+				while (suffixLen < (Math.min(na.length, nr.length) - prefixLen)
+					&& na[na.length - 1 - suffixLen] === nr[nr.length - 1 - suffixLen]) suffixLen++;
+				if ((prefixLen + suffixLen) / maxLen > 0.95) { dominated = true; break; }
+			}
+			if (!dominated) result.push(a);
+		}
+		return result;
+	}
+
 	/**
 	 * Determine the JSON filename for the current act.
 	 * ELI-type: eli/constitution/1994/02/17/1994021048/justel → eli_constitution_1994_02_17_1994021048_justel.json
@@ -107,7 +145,7 @@ window.BJ.caselawModule = function(ctx) {
 		const filename = getCaselawFilename();
 		if (!filename) {
 			console.log("[Better Justel - Case Law] Cannot determine Juportal Crawler filename for this act");
-			return await ctx.getStorage(caselawKey) || null;
+			return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 		}
 
 		const url = GITHUB_RAW_BASE + filename;
@@ -123,7 +161,7 @@ window.BJ.caselawModule = function(ctx) {
 				}
 				// Record the fetch attempt even on failure to avoid re-fetching too soon
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return await ctx.getStorage(caselawKey) || null;
+				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 			}
 
 			const rawText = await response.text();
@@ -133,7 +171,7 @@ window.BJ.caselawModule = function(ctx) {
 			} catch (e) {
 				console.error("[Better Justel - Case Law] Invalid JSON received from Juportal Crawler:", e.message);
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return await ctx.getStorage(caselawKey) || null;
+				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 			}
 
 			// Sanitize
@@ -141,7 +179,7 @@ window.BJ.caselawModule = function(ctx) {
 			if (!cleanData) {
 				console.error("[Better Justel - Case Law] Sanitization failed — data discarded");
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return await ctx.getStorage(caselawKey) || null;
+				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 			}
 
 			const totalAbstracts = countAbstracts(cleanData);
@@ -149,25 +187,31 @@ window.BJ.caselawModule = function(ctx) {
 
 			// Check for updates vs cached version
 			const cachedData = await ctx.getStorage(caselawKey);
+			let newAbstracts = 0;
 			if (cachedData) {
 				const oldCount = countAbstracts(cachedData);
 				if (totalAbstracts !== oldCount) {
-					console.log(`[Better Justel - Case Law] Detected updates: ${oldCount} → ${totalAbstracts} abstracts`);
+					console.log(`[Better Justel - Case Law] Detected updates: ${oldCount} \u2192 ${totalAbstracts} abstracts`);
+					newAbstracts = Math.max(0, totalAbstracts - oldCount);
 				} else {
-					console.log("[Better Justel - Case Law] No updates detected — data unchanged");
+					console.log("[Better Justel - Case Law] No updates detected \u2014 data unchanged");
 				}
+			} else {
+				// First-time fetch \u2014 all abstracts are new
+				newAbstracts = totalAbstracts;
 			}
+			const newArticles = Object.keys(cleanData).length;
 
 			// Save to localStorage
 			await ctx.setStorage(caselawKey, cleanData);
 			await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
 
-			return cleanData;
+			return { data: cleanData, newAbstracts, newArticles };
 		}
 		catch (e) {
 			console.error("[Better Justel - Case Law] Network error fetching case-law:", e.message);
 			await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-			return await ctx.getStorage(caselawKey) || null;
+			return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 		}
 	}
 
@@ -232,11 +276,11 @@ window.BJ.caselawModule = function(ctx) {
 			}
 			if (!abstracts.length) continue;
 
-			// Deduplicate identical abstracts for the same judgement
-			const uniqueAbstracts = [...new Set(abstracts)];
+			// Deduplicate near-identical abstracts for the same judgement
+			const uniqueAbstracts = deduplicateAbstracts(abstracts);
 
 			const formattedDate = formatDateFrench(d.date);
-			const courtAbbr = d.court || "";
+			const courtAbbr = COURT_ABBR_MAP[d.court] || d.court || "";
 			const roleNumber = d.roleNumber || "";
 			const urlLink = d.url
 				? `<a href="${d.url}" target="_blank">${formattedDate}</a>`
@@ -248,7 +292,7 @@ window.BJ.caselawModule = function(ctx) {
 			}
 		}
 
-		return items.length ? `<ul>${items.join("")}</ul>` : "";
+		return items.length ? `<ol>${items.join("")}</ol>` : "";
 	}
 
 	/**
@@ -282,12 +326,12 @@ window.BJ.caselawModule = function(ctx) {
 
 			const articleData = caselawData[artNumber];
 			const totalDecisions = Object.keys(articleData).length;
-			// Count unique abstracts
+			// Count unique abstracts (using same dedup logic as buildCaselawHTML)
 			let totalAbstracts = 0;
 			for (const ecli of Object.keys(articleData)) {
 				const d = articleData[ecli];
-				if (d.abstractFR?.length) totalAbstracts += new Set(d.abstractFR).size;
-				else if (d.abstractNL?.length) totalAbstracts += new Set(d.abstractNL).size;
+				if (d.abstractFR?.length) totalAbstracts += deduplicateAbstracts(d.abstractFR).length;
+				else if (d.abstractNL?.length) totalAbstracts += deduplicateAbstracts(d.abstractNL).length;
 			}
 			if (!totalAbstracts) continue;
 
@@ -297,8 +341,9 @@ window.BJ.caselawModule = function(ctx) {
 			const caselawBlock = document.createElement("div");
 			caselawBlock.classList.add("caselaw-block");
 			caselawBlock.innerHTML =
+				`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
 				`<div class="caselaw-header" role="button" tabindex="0">` +
-				`<span class="caselaw-toggle">▶</span> Case law (${totalAbstracts})</div>` +
+				`<span class="caselaw-toggle">▶</span> Case law (${totalAbstracts}) on Article ${artNumber}</div>` +
 				`<div class="caselaw-content" style="display: none;">${html}</div>`;
 
 			// Insert after the article div
@@ -310,18 +355,30 @@ window.BJ.caselawModule = function(ctx) {
 		}
 
 		// Set up toggle behaviour
+		function toggleCaselawBlock(block) {
+			const content = block.querySelector(".caselaw-content");
+			const toggle = block.querySelector(".caselaw-toggle");
+			if (content.style.display === "none") {
+				content.style.display = "block";
+				toggle.textContent = "▼";
+			} else {
+				content.style.display = "none";
+				toggle.textContent = "▶";
+			}
+		}
+
 		document.querySelectorAll("div.caselaw-header").forEach(header => {
 			header.addEventListener("click", function() {
-				const content = this.nextElementSibling;
-				const toggle = this.querySelector(".caselaw-toggle");
-				if (content.style.display === "none") {
-					content.style.display = "block";
-					toggle.textContent = "▼";
-				} else {
-					content.style.display = "none";
-					toggle.textContent = "▶";
-				}
+				toggleCaselawBlock(this.closest(".caselaw-block"));
 			});
+		});
+
+		document.querySelectorAll("div.caselaw-border-bar").forEach(bar => {
+			bar.addEventListener("click", function() {
+				toggleCaselawBlock(this.closest(".caselaw-block"));
+			});
+		});
+		document.querySelectorAll("div.caselaw-header").forEach(header => {
 			header.addEventListener("keydown", function(e) {
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
@@ -409,13 +466,12 @@ window.BJ.caselawModule = function(ctx) {
 
 	/**
 	 * Remove a case-law highlight by ID.
+	 * Note: the highlight element may already be detached from the DOM
+	 * (unwrapped before this is called), so we search all article keys.
 	 */
 	async function removeCaselawHighlight(highlightElement) {
 		const key = "highlights-caselaw-" + ctx.act.eli;
 		const quotes = await ctx.getStorage(key) || {};
-		const articleDiv = $(highlightElement).parents(".article")[0];
-		if (!articleDiv) return;
-		const articleId = articleDiv.id.replace("anchor_", "");
 
 		for (const artId in quotes) {
 			const idx = quotes[artId].findIndex(q => q.id === highlightElement.id);
@@ -459,9 +515,10 @@ window.BJ.caselawModule = function(ctx) {
 	 * Clear the fetch timestamp for this act, allowing a re-check on the same day.
 	 */
 	async function clearCaselawFetchFlag() {
-		const fetchInfoKey = "caselaw-fetch-" + ctx.act.eli;
-		await ctx.setStorage(fetchInfoKey, null);
-		console.log(`[Better Justel - Case Law] Cleared fetch flag for ${ctx.act.eli}`);
+		const eli = ctx.act.eli;
+		await ctx.setStorage("caselaw-fetch-" + eli, null);
+		await ctx.setStorage("caselaw-" + eli, null);
+		console.log(`[Better Justel - Case Law] Cleared case-law data and fetch flag for ${eli}`);
 	}
 
 	/**
@@ -469,11 +526,16 @@ window.BJ.caselawModule = function(ctx) {
 	 */
 	async function loadAndDisplayCaseLaw() {
 		try {
-			const caselawData = await fetchCaseLaw();
+			const { data: caselawData, newAbstracts, newArticles } = await fetchCaseLaw();
 			if (caselawData && Object.keys(caselawData).length > 0) {
 				displayCaseLaw(caselawData);
 				// Load case-law highlights after blocks are injected
 				ctx.caselawHighlights = await loadCaselawHighlights();
+				if (newAbstracts > 0) {
+					const aStr = newAbstracts === 1 ? "abstract" : "abstracts";
+					const artStr = newArticles === 1 ? "article" : "articles";
+					ctx.showStatusMessage(`Fetched ${newAbstracts} new case law ${aStr} for ${newArticles} ${artStr} from Juportal database`);
+				}
 			} else {
 				console.log("[Better Justel - Case Law] No case-law data to display");
 			}

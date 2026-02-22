@@ -408,18 +408,24 @@ div#status {
 	bottom: 0;
 	left: 0;
 	right: 0;
+	z-index: 999;
+	display: flex;
+	flex-direction: column;
+	pointer-events: none; /* clicks pass through the empty container */
+}
+
+div.status-item {
 	background-color: #0e63ac;
 	color: #fff;
 	text-align: center;
 	padding: 10px;
-	z-index: 999;
-	overflow: hidden;
-	opacity: 0; /* Initially hidden */
+	opacity: 0;
 	transform: translateY(100%);
-	transition: transform 1s ease-in-out, opacity 1s ease-in-out;
+	transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
+	pointer-events: auto;
 }
 
-div#status a {
+div.status-item a {
 	color: yellow;
 }
 
@@ -471,13 +477,27 @@ div#bookmark-bar div#items div span.bookmark::before {
 
 /* Case law blocks */
 div.caselaw-block {
-	margin-top: 8px;
-	margin-bottom: 4px;
-	border-left: 3px solid #7b8ea0;
-	padding-left: 10px;
+	position: relative;
+	margin-top: 4px;
+	margin-bottom: 16px;
+	padding-left: 14px;
 	font-size: 0.82rem;
 	color: #333;
 	line-height: 1.45em;
+}
+
+div.caselaw-border-bar {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 10px;
+	border-left: 3px solid #7b8ea0;
+	cursor: pointer;
+}
+
+div.caselaw-border-bar:hover {
+	border-left-color: #2a4a6b;
 }
 
 div.caselaw-header {
@@ -503,7 +523,8 @@ div.caselaw-content {
 	padding: 4px 0 8px 0;
 }
 
-div.caselaw-content ul {
+div.caselaw-content ul,
+div.caselaw-content ol {
 	margin: 4px 0;
 	padding-left: 20px;
 }
