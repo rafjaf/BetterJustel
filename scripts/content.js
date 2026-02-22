@@ -36,6 +36,9 @@
 	const {updateBookmarkBar, manageHighlights} = BJ.highlightsModule(ctx);
 	Object.assign(ctx, {updateBookmarkBar, manageHighlights});
 
+	const {loadAndDisplayCaseLaw, clearCaselawFetchFlag, isInCaselawBlock, saveCaselawHighlight, removeCaselawHighlight, updateCaselawHighlight} = BJ.caselawModule(ctx);
+	Object.assign(ctx, {loadAndDisplayCaseLaw, clearCaselawFetchFlag, isInCaselawBlock, saveCaselawHighlight, removeCaselawHighlight, updateCaselawHighlight});
+
 	const {analyseFirstInfo, analyseFurtherInfo} = BJ.infoModule(ctx);
 
 	const {displayContent} = BJ.displayModule(ctx);

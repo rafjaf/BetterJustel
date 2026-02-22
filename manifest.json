@@ -43,6 +43,7 @@
 		    "scripts/content-info.js",
 		    "scripts/content-display.js",
 		    "scripts/content-highlights.js",
+		    "scripts/content-caselaw.js",
 		    "scripts/content-dropbox.js",
 		    "scripts/content-search.js",
 		    "scripts/content.js"
@@ -60,7 +61,8 @@
     }
   ],
   "host_permissions": [
-	"https://www.ejustice.just.fgov.be/eli/*"
+	"https://www.ejustice.just.fgov.be/eli/*",
+	"https://raw.githubusercontent.com/rafjaf/juportal_crawler/*"
   ],
   "web_accessible_resources": [
     {

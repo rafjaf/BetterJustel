@@ -111,6 +111,8 @@ window.BJ.displayModule = function(ctx) {
 				$(this).jstree("open_all");
 				await loadHighlights();
 				ctx.updateBookmarkBar();
+				// Load and display case law after content and highlights are ready
+				await ctx.loadAndDisplayCaseLaw();
 			})
 			.on("select_node.jstree", function(event, data) {
 				$("div#anchor_" + data.node.id)[0].scrollIntoView( true );
@@ -128,6 +130,8 @@ window.BJ.displayModule = function(ctx) {
 			await ctx.setStorage("updateInfo", ctx.updateInfo);
 			ctx.numac2eli[ctx.act.numac] = "";
 			await ctx.setStorage("numac2eli", ctx.numac2eli);
+			// Clear case-law fetch flag to allow re-check
+			await ctx.clearCaselawFetchFlag();
 			$("a#clearDB").parent().hide("slow");
 		});
 		// Change document title

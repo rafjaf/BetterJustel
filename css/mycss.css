@@ -469,3 +469,56 @@ div#bookmark-bar div#items div span.bookmark::before {
 	margin-right: 5px;
 }
 
+/* Case law blocks */
+div.caselaw-block {
+	margin-top: 8px;
+	margin-bottom: 4px;
+	border-left: 3px solid #7b8ea0;
+	padding-left: 10px;
+	font-size: 0.82rem;
+	color: #333;
+	line-height: 1.45em;
+}
+
+div.caselaw-header {
+	cursor: pointer;
+	font-weight: bold;
+	color: #4a6785;
+	user-select: none;
+	padding: 4px 0;
+}
+
+div.caselaw-header:hover {
+	color: #2a4a6b;
+}
+
+span.caselaw-toggle {
+	display: inline-block;
+	width: 16px;
+	font-size: 0.7rem;
+	text-align: center;
+}
+
+div.caselaw-content {
+	padding: 4px 0 8px 0;
+}
+
+div.caselaw-content ul {
+	margin: 4px 0;
+	padding-left: 20px;
+}
+
+div.caselaw-content li {
+	margin-bottom: 8px;
+	text-align: justify;
+}
+
+div.caselaw-content a {
+	color: cornflowerblue;
+	text-decoration: none;
+}
+
+div.caselaw-content a:hover {
+	text-decoration: underline;
+}
+
