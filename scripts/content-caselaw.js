@@ -137,7 +137,7 @@ window.BJ.caselawModule = function(ctx) {
 				if (cached) {
 					console.log(`[Better Justel - Case Law] Using cached case-law data (${countAbstracts(cached)} abstracts)`);
 				}
-				return cached || null;
+				return { data: cached || null, newAbstracts: 0, newArticles: 0 };
 			}
 		}
 
