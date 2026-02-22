@@ -89,6 +89,7 @@ async function populateListOfStoredActs() {
 			await setStorage("numac2eli", numac2eli);
 			// Clear case-law fetch flag to allow re-check
 			await setStorage("caselaw-fetch-" + eli, null);
+			await setStorage("caselaw-" + eli, null);
 			// Clear highlights in database
 			// await setStorage("highlights-" + eli, "");
 			// Remove from popup list of acts
