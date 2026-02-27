@@ -547,3 +547,9 @@ div.caselaw-content a:hover {
 	text-decoration: underline;
 }
 
+/* TOC: highlight articles that have case law */
+.jstree-default .jstree-anchor.has-caselaw {
+	background-color: #dfe6ed !important;
+	border-radius: 2px;
+}
+

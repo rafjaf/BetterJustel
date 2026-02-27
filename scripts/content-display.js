@@ -26,22 +26,32 @@ window.BJ.displayModule = function(ctx) {
 					}
 					else {
 						for (let q of ctx.highlights.quotes[key]) {
-							let range = anchoring.TextQuoteAnchor.toRange(document.querySelector(`div#content div#anchor_${article.slice(0,9)}`), q);
-							if (!range) {
-								ctx.showStatusMessage(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
-								console.info(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
+							try {
+								let range = anchoring.TextQuoteAnchor.toRange(document.querySelector(`div#content div#anchor_${article.slice(0,9)}`), q);
+								if (!range) {
+									ctx.showStatusMessage(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
+									console.info(`Quote ${JSON.stringify(q)} cannot be found anymore in article "${key}", deleting highlight from database`);
+									let i = ctx.highlights.quotes[key].findIndex(el => el.id == q.id);
+									ctx.highlights.quotes[key].splice(i, 1);
+									if (!ctx.highlights.quotes[key].length) { delete ctx.highlights.quotes[key]; }
+									changesMade = true;
+								}
+								else {
+									let h = document.createElement("highlight");
+									h.id = q.id;
+									h.classList.add(q.color);
+									if (q.annotation) { h.classList.add("annotated"); }
+									let wrapper = anchoring.WrapRangeText(h, range);
+									ctx.highlights.wrappers[h.id] = wrapper;
+								}
+							} catch (e) {
+								console.warn(`[Better Justel] Error anchoring highlight in article "${key}":`, e.message);
 								let i = ctx.highlights.quotes[key].findIndex(el => el.id == q.id);
-								ctx.highlights.quotes[key].splice(i, 1);
-								if (!ctx.highlights.quotes[key].length) { delete ctx.highlights.quotes[key]; }
-								changesMade = true;
-							}
-							else {
-								let h = document.createElement("highlight");
-								h.id = q.id;
-								h.classList.add(q.color);
-								if (q.annotation) { h.classList.add("annotated"); }
-								let wrapper = anchoring.WrapRangeText(h, range);
-								ctx.highlights.wrappers[h.id] = wrapper;
+								if (i !== -1) {
+									ctx.highlights.quotes[key].splice(i, 1);
+									if (!ctx.highlights.quotes[key].length) { delete ctx.highlights.quotes[key]; }
+									changesMade = true;
+								}
 							}
 						}
 					}

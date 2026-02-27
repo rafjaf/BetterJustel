@@ -70,11 +70,14 @@
 	}
 
 	async function main() {
+		console.log(`[Better Justel] main() started (readyState: "${document.readyState}", URL: ${window.location.href})`);
 		// Identify act
 		await analyseFirstInfo();
+		console.log(`[Better Justel] Act identified: ${ctx.act.eli} (numac: ${ctx.act.numac}, lastUpdate: ${ctx.act.lastUpdate})`);
 		// If URL is not ELI, redirect to ELI
 		if ( ((window.location.origin + window.location.pathname) != ctx.act.eli)
 				 && (ctx.act.eli.indexOf("cgi_") == -1) ) {
+			console.log(`[Better Justel] Redirecting to ELI: ${ctx.act.eli}`);
 			window.location.href = ctx.act.eli;
 			return;
 		}
@@ -84,6 +87,7 @@
 			 && (ctx.updateInfo[ctx.act.eli]?.act == ctx.act.lastUpdate) ) {
 			// Offline mode
 			// Page can be restored since it did not change (nor the script)
+			console.log("[Better Justel] Using cached version (offline mode)");
 			window.stop();
 			addLoading("Restoring page from offline database");
 			ctx.act = await getStorage(ctx.act.eli);
@@ -92,16 +96,32 @@
 		else {
 			// Online mode
 			// Page must be loaded and analysed since it cannot be restored
+			console.log(`[Better Justel] Online mode — need to load and analyse page (readyState: "${document.readyState}", ` +
+				`cachedScript: ${ctx.updateInfo[ctx.act.eli]?.script || "none"}, currentScript: ${chrome.runtime.getManifest().version}, ` +
+				`cachedAct: ${ctx.updateInfo[ctx.act.eli]?.act || "none"}, currentAct: ${ctx.act.lastUpdate})`);
 			addLoading("Loading page from Justel server");
-			if (document.readyState == "complete") {
+
+			// Safety timeout: if page analysis doesn't start within 45s, force reload
+			const safetyTimer = setTimeout(() => {
+				console.error(`[Better Justel] Safety timeout: page analysis did not start within 45s (readyState: "${document.readyState}"). Forcing reload.`);
+				window.location.reload();
+			}, 45000);
+
+			async function runAnalysis() {
+				clearTimeout(safetyTimer);
+				console.log(`[Better Justel] DOM ready — starting analysis (readyState: "${document.readyState}")`);
 				await analyseAct();
 				await displayContent(true);
 			}
-			else {
-				document.addEventListener("DOMContentLoaded", async () => {
-					await analyseAct();
-					await displayContent(true);
-				});
+
+			if (document.readyState === "loading") {
+				// DOM not yet parsed — wait for DOMContentLoaded
+				console.log("[Better Justel] Waiting for DOMContentLoaded...");
+				document.addEventListener("DOMContentLoaded", runAnalysis);
+			} else {
+				// DOM already parsed (readyState is "interactive" or "complete")
+				console.log(`[Better Justel] DOM already parsed (readyState: "${document.readyState}"), proceeding immediately`);
+				await runAnalysis();
 			}
 		}
 	}

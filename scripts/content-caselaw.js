@@ -156,11 +156,13 @@ window.BJ.caselawModule = function(ctx) {
 			if (!response.ok) {
 				if (response.status === 404) {
 					console.log(`[Better Justel - Case Law] No case-law data found on Juportal Crawler for ${eli}`);
+					// 404 means genuinely no data — record fetch to avoid re-fetching too soon
+					await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
 				} else {
-					console.warn(`[Better Justel - Case Law] HTTP error ${response.status} fetching case-law for ${eli}`);
+					console.warn(`[Better Justel - Case Law] HTTP error ${response.status} fetching case-law for ${eli} — will retry on next load`);
+					// Do not update fetch timestamp for server errors — allow retry on next load
 				}
-				// Record the fetch attempt even on failure to avoid re-fetching too soon
-				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
+				// Keep existing cached data, if any
 				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 			}
 
@@ -182,27 +184,30 @@ window.BJ.caselawModule = function(ctx) {
 				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 			}
 
-			const totalAbstracts = countAbstracts(cleanData);
-			console.log(`[Better Justel - Case Law] Successfully fetched ${totalAbstracts} abstracts for ${eli}`);
-
-			// Check for updates vs cached version
+			// Check for updates vs cached version using deep comparison
 			const cachedData = await ctx.getStorage(caselawKey);
-			let newAbstracts = 0;
+			const cachedJSON = cachedData ? JSON.stringify(cachedData) : null;
+			const cleanJSON = JSON.stringify(cleanData);
+
+			if (cachedJSON === cleanJSON) {
+				console.log("[Better Justel - Case Law] No updates detected — data unchanged (deep comparison)");
+				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
+				return { data: cleanData, newAbstracts: 0, newArticles: 0 };
+			}
+
+			// Data has changed — replace entire cache
+			const totalAbstracts = countAbstracts(cleanData);
+			let newAbstracts = totalAbstracts;
 			if (cachedData) {
 				const oldCount = countAbstracts(cachedData);
-				if (totalAbstracts !== oldCount) {
-					console.log(`[Better Justel - Case Law] Detected updates: ${oldCount} \u2192 ${totalAbstracts} abstracts`);
-					newAbstracts = Math.max(0, totalAbstracts - oldCount);
-				} else {
-					console.log("[Better Justel - Case Law] No updates detected \u2014 data unchanged");
-				}
+				console.log(`[Better Justel - Case Law] Data changed: ${oldCount} → ${totalAbstracts} abstracts — replacing cache entirely`);
+				newAbstracts = Math.max(0, totalAbstracts - oldCount);
 			} else {
-				// First-time fetch \u2014 all abstracts are new
-				newAbstracts = totalAbstracts;
+				console.log(`[Better Justel - Case Law] First fetch: ${totalAbstracts} abstracts for ${eli}`);
 			}
 			const newArticles = Object.keys(cleanData).length;
 
-			// Save to localStorage
+			// Replace stored data entirely
 			await ctx.setStorage(caselawKey, cleanData);
 			await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
 
@@ -210,7 +215,8 @@ window.BJ.caselawModule = function(ctx) {
 		}
 		catch (e) {
 			console.error("[Better Justel - Case Law] Network error fetching case-law:", e.message);
-			await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
+			// Do not update fetch timestamp on network error — allow retry on next load
+			// Keep existing cached data, if any
 			return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
 		}
 	}
@@ -292,9 +298,8 @@ window.BJ.caselawModule = function(ctx) {
 			const formattedDate = formatDateFrench(d.date);
 			const courtAbbr = COURT_ABBR_MAP[d.court] || d.court || "";
 			const roleNumber = d.roleNumber || "";
-			const urlLink = d.url
-				? `<a href="${d.url}" target="_blank">${formattedDate}</a>`
-				: formattedDate;
+			const juportalUrl = `https://juportal.just.fgov.be/content/ViewDecision.php?id=${encodeURIComponent(d.ecli)}&lang=fr`;
+			const urlLink = `<a href="${juportalUrl}" target="_blank">${formattedDate}</a>`;
 			const citation = `(${courtAbbr}, ${urlLink}, n° ${roleNumber})`;
 
 			for (const abstract of uniqueAbstracts) {
@@ -361,6 +366,43 @@ window.BJ.caselawModule = function(ctx) {
 			if (articleDiv) {
 				articleDiv.appendChild(caselawBlock);
 				articlesWithCaselaw++;
+				// Mark article in TOC as having case law (grey background)
+				const treeAnchor = document.getElementById(article.id + "_anchor");
+				if (treeAnchor) {
+					treeAnchor.classList.add("has-caselaw");
+				}
+			}
+		}
+
+		// Handle "general" case law (applies to the act as a whole)
+		if (caselawData["general"]) {
+			const generalData = caselawData["general"];
+			let totalGeneralAbstracts = 0;
+			for (const ecli of Object.keys(generalData)) {
+				const d = generalData[ecli];
+				if (d.abstractFR?.length) totalGeneralAbstracts += deduplicateAbstracts(d.abstractFR).length;
+				else if (d.abstractNL?.length) totalGeneralAbstracts += deduplicateAbstracts(d.abstractNL).length;
+			}
+			if (totalGeneralAbstracts > 0) {
+				const html = buildCaselawHTML(generalData);
+				if (html) {
+					const generalBlock = document.createElement("div");
+					generalBlock.classList.add("caselaw-block");
+					generalBlock.innerHTML =
+						`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
+						`<div class="caselaw-header" role="button" tabindex="0">` +
+						`<span class="caselaw-toggle">▶</span> Case law (${totalGeneralAbstracts}) on this act as a whole</div>` +
+						`<div class="caselaw-content" style="display: none;">${html}</div>`;
+
+					// Insert just under the first title of the document
+					const firstNode = ctx.act.content[0];
+					if (firstNode) {
+						const firstHeadingDiv = document.querySelector(`div#anchor_${firstNode.id}`);
+						if (firstHeadingDiv) {
+							firstHeadingDiv.insertAdjacentElement('afterend', generalBlock);
+						}
+					}
+				}
 			}
 		}
 

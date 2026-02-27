@@ -73,6 +73,7 @@ window.BJ.highlightsModule = function(ctx) {
 				else {
 					// Do something if another color than white has been selected
 					if (event.target.classList[1] != "white") {
+					  try {
 						// Check if we are in a case-law block
 						let inCaselaw = ctx.isInCaselawBlock(ctx.currentRange.startContainer);
 						// Highlight it
@@ -104,6 +105,9 @@ window.BJ.highlightsModule = function(ctx) {
 							ctx.highlights.quotes[articleText].push(quoteSelector);
 							await ctx.setStorage("highlights-" + ctx.act.eli, ctx.highlights.quotes);
 						}
+					  } catch (e) {
+						console.warn("[Better Justel] Error creating highlight (anchoring failed):", e.message);
+					  }
 					}
 				}
 			}

@@ -2,13 +2,26 @@ window.BJ = window.BJ || {};
 window.BJ.infoModule = function(ctx) {
 
 	async function analyseFirstInfo() {
+		console.log(`[Better Justel] analyseFirstInfo() started (readyState: "${document.readyState}")`);
 		// Capture numac of the act from the top of the page
 		ctx.act.numac = document.querySelector("div#list-title-1 span.tag")?.textContent;
+		let _numacWaitMs = 0;
 		while (!ctx.act.numac) {  
 			ctx.addLoading("Checking Justel server for an updated version of the page");
 			await ctx.delay(500);
+			_numacWaitMs += 500;
 			ctx.act.numac = document.querySelector("div#list-title-1 span.tag")?.textContent;
+			if (_numacWaitMs % 5000 === 0) {
+				console.warn(`[Better Justel] Still waiting for numac after ${_numacWaitMs / 1000}s (readyState: "${document.readyState}", ` +
+					`body children: ${document.body?.children?.length || 0}, title-1 exists: ${!!document.querySelector("div#list-title-1")})`);
+			}
+			if (_numacWaitMs >= 30000) {
+				console.error("[Better Justel] Timeout waiting for numac after 30s — forcing reload");
+				window.location.reload();
+				return;
+			}
 		}
+		console.log(`[Better Justel] Numac found: ${ctx.act.numac} (after ${_numacWaitMs}ms)`);
 		// Check if ELI can be determined from numac
 		if (ctx.numac2eli[ctx.act.numac]) {
 			ctx.act.eli = ctx.numac2eli[ctx.act.numac];
