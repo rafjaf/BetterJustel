@@ -270,10 +270,24 @@ window.BJ.caselawModule = function(ctx) {
 	}
 
 	/**
+	 * Normalize an abstract string for deduplication:
+	 * collapses whitespace, unifies Unicode apostrophes/quotes, strips zero-width chars.
+	 */
+	function normalizeAbstract(s) {
+		return s
+			.replace(/[\u00A0\u200B\uFEFF]/g, " ")              // NBSP, zero-width, BOM → space
+			.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")  // curly/prime apostrophes → '
+			.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')  // curly quotes → "
+			.replace(/\s+/g, " ")
+			.trim();
+	}
+
+	/**
 	 * Build the HTML for case-law abstracts for a given article.
 	 * Sorts decisions by date (most recent first).
 	 * Displays FR abstracts by priority, NL if FR unavailable.
-	 * Deduplicates identical abstracts for the same judgement.
+	 * Deduplicates based on (normalizedAbstractText, roleNumber) — catches duplicates
+	 * regardless of whether they share the same ECLI or not.
 	 */
 	function buildCaselawHTML(articleData) {
 		// Collect all decisions and sort by date (most recent first)
@@ -281,6 +295,7 @@ window.BJ.caselawModule = function(ctx) {
 			.map(([ecli, d]) => ({ ecli, ...d }))
 			.sort((a, b) => b.date.localeCompare(a.date));
 
+		const seenKeys = new Set();
 		const items = [];
 		for (const d of decisions) {
 			// Choose FR abstracts by priority, NL as fallback
@@ -292,9 +307,6 @@ window.BJ.caselawModule = function(ctx) {
 			}
 			if (!abstracts.length) continue;
 
-			// Deduplicate near-identical abstracts for the same judgement
-			const uniqueAbstracts = deduplicateAbstracts(abstracts);
-
 			const formattedDate = formatDateFrench(d.date);
 			const courtAbbr = COURT_ABBR_MAP[d.court] || d.court || "";
 			const roleNumber = d.roleNumber || "";
@@ -302,12 +314,32 @@ window.BJ.caselawModule = function(ctx) {
 			const urlLink = `<a href="${juportalUrl}" target="_blank">${formattedDate}</a>`;
 			const citation = `(${courtAbbr}, ${urlLink}, n° ${roleNumber})`;
 
-			for (const abstract of uniqueAbstracts) {
+			for (const abstract of abstracts) {
+				// Key on normalized text + role number: catches duplicates whether they share
+				// the same ECLI or not, and regardless of Unicode apostrophe/quote variants.
+				const key = normalizeAbstract(abstract) + "\x00" + roleNumber;
+				if (seenKeys.has(key)) continue;
+				seenKeys.add(key);
 				items.push(`<li>${abstract} : ${citation}</li>`);
 			}
 		}
 
 		return items.length ? `<ol>${items.join("")}</ol>` : "";
+	}
+
+	/**
+	 * Count unique abstracts in an articleData object using the same dedup logic as buildCaselawHTML.
+	 */
+	function countUniqueAbstracts(articleData) {
+		const seenKeys = new Set();
+		for (const [, d] of Object.entries(articleData)) {
+			const abstracts = (d.abstractFR?.length ? d.abstractFR : d.abstractNL) || [];
+			const roleNumber = d.roleNumber || "";
+			for (const abstract of abstracts) {
+				seenKeys.add(normalizeAbstract(abstract) + "\x00" + roleNumber);
+			}
+		}
+		return seenKeys.size;
 	}
 
 	/**
@@ -340,14 +372,7 @@ window.BJ.caselawModule = function(ctx) {
 			if (!artNumber || !caselawData[artNumber]) continue;
 
 			const articleData = caselawData[artNumber];
-			const totalDecisions = Object.keys(articleData).length;
-			// Count unique abstracts (using same dedup logic as buildCaselawHTML)
-			let totalAbstracts = 0;
-			for (const ecli of Object.keys(articleData)) {
-				const d = articleData[ecli];
-				if (d.abstractFR?.length) totalAbstracts += deduplicateAbstracts(d.abstractFR).length;
-				else if (d.abstractNL?.length) totalAbstracts += deduplicateAbstracts(d.abstractNL).length;
-			}
+			const totalAbstracts = countUniqueAbstracts(articleData);
 			if (!totalAbstracts) continue;
 
 			const html = buildCaselawHTML(articleData);
@@ -377,12 +402,7 @@ window.BJ.caselawModule = function(ctx) {
 		// Handle "general" case law (applies to the act as a whole)
 		if (caselawData["general"]) {
 			const generalData = caselawData["general"];
-			let totalGeneralAbstracts = 0;
-			for (const ecli of Object.keys(generalData)) {
-				const d = generalData[ecli];
-				if (d.abstractFR?.length) totalGeneralAbstracts += deduplicateAbstracts(d.abstractFR).length;
-				else if (d.abstractNL?.length) totalGeneralAbstracts += deduplicateAbstracts(d.abstractNL).length;
-			}
+			const totalGeneralAbstracts = countUniqueAbstracts(generalData);
 			if (totalGeneralAbstracts > 0) {
 				const html = buildCaselawHTML(generalData);
 				if (html) {
@@ -437,6 +457,14 @@ window.BJ.caselawModule = function(ctx) {
 					this.click();
 				}
 			});
+		});
+
+		// Remove any <br> immediately preceding a caselaw block
+		document.querySelectorAll("div.caselaw-block").forEach(block => {
+			const prev = block.previousSibling;
+			if (prev && prev.nodeName === "BR") {
+				prev.remove();
+			}
 		});
 
 		console.log(`[Better Justel - Case Law] Displayed case-law for ${articlesWithCaselaw} articles`);
