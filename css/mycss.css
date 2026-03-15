@@ -378,6 +378,10 @@ div.article:hover span.subpar {
 	visibility: visible;
 }
 
+body.has-selection div.article:hover span.subpar {
+	visibility: hidden;
+}
+
 div.article span.bookmark {
 	position: absolute;
 	margin-left: -25px;
@@ -396,6 +400,10 @@ div.article.bookmark span.bookmark::before {
 
 div.article:hover span.bookmark {
 	opacity: 1;
+}
+
+body.has-selection div.article:hover span.bookmark {
+	opacity: 0;
 }
 
 span.bookmark:hover {

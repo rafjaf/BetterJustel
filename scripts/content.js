@@ -58,6 +58,7 @@
 				date: ctx.act.date,
 				fullTitle: ctx.act.fullTitle,
 				script: chrome.runtime.getManifest().version,
+				lastChecked: new Date().toISOString().slice(0, 10),
 			};
 			await setStorage("updateInfo", ctx.updateInfo);
 		}
@@ -71,18 +72,53 @@
 
 	async function main() {
 		console.log(`[Better Justel] main() started (readyState: "${document.readyState}", URL: ${window.location.href})`);
+		// Check if we already consulted eJustice today for this page
+		const currentURL = window.location.origin + window.location.pathname;
+		const today = new Date().toISOString().slice(0, 10);
+		ctx.updateInfo = await getStorage("updateInfo") || {};
+		const cached = ctx.updateInfo[currentURL];
+		if ( cached
+			 && cached.script == chrome.runtime.getManifest().version
+			 && cached.lastChecked == today ) {
+			// Already checked today — restore from cache without contacting eJustice
+			console.log(`[Better Justel] Already checked today (${today}) — restoring from cache`);
+			window.stop();
+			addLoading("Restoring page from offline database");
+			ctx.act = await getStorage(currentURL);
+			if (ctx.act) {
+				await displayContent(false);
+				return;
+			}
+			// Cache entry exists in updateInfo but act data missing — fall through to online check
+			console.warn("[Better Justel] Cache entry found but act data missing — falling back to online check");
+		}
 		// Identify act
-		await analyseFirstInfo();
+		const infoResult = await analyseFirstInfo();
+		if (infoResult?.timeout) {
+			// Server is down — try to restore from cache
+			console.warn("[Better Justel] Server timeout — attempting to restore from cache");
+			// Try to find a cached version for this URL
+			const cachedAct = await getStorage(currentURL);
+			if (cachedAct) {
+				window.stop();
+				addLoading("Server unreachable — restoring page from offline database");
+				ctx.act = cachedAct;
+				await displayContent(false);
+				return;
+			}
+			// No cache available — nothing we can do
+			addLoading("Server unreachable and no cached version available. <a href='javascript:window.location.reload()'>Retry</a>");
+			return;
+		}
 		console.log(`[Better Justel] Act identified: ${ctx.act.eli} (numac: ${ctx.act.numac}, lastUpdate: ${ctx.act.lastUpdate})`);
 		// If URL is not ELI, redirect to ELI
-		if ( ((window.location.origin + window.location.pathname) != ctx.act.eli)
+		if ( (currentURL != ctx.act.eli)
 				 && (ctx.act.eli.indexOf("cgi_") == -1) ) {
 			console.log(`[Better Justel] Redirecting to ELI: ${ctx.act.eli}`);
 			window.location.href = ctx.act.eli;
 			return;
 		}
 		// Now, check whether the latest version of the act is stored in the database
-		ctx.updateInfo = await getStorage("updateInfo") || {};
 		if ( (ctx.updateInfo[ctx.act.eli]?.script == chrome.runtime.getManifest().version)
 			 && (ctx.updateInfo[ctx.act.eli]?.act == ctx.act.lastUpdate) ) {
 			// Offline mode
@@ -91,6 +127,9 @@
 			window.stop();
 			addLoading("Restoring page from offline database");
 			ctx.act = await getStorage(ctx.act.eli);
+			// Record that we checked today
+			ctx.updateInfo[ctx.act.eli].lastChecked = today;
+			await setStorage("updateInfo", ctx.updateInfo);
 			await displayContent(false);
 		}
 		else {
@@ -101,10 +140,19 @@
 				`cachedAct: ${ctx.updateInfo[ctx.act.eli]?.act || "none"}, currentAct: ${ctx.act.lastUpdate})`);
 			addLoading("Loading page from Justel server");
 
-			// Safety timeout: if page analysis doesn't start within 45s, force reload
-			const safetyTimer = setTimeout(() => {
-				console.error(`[Better Justel] Safety timeout: page analysis did not start within 45s (readyState: "${document.readyState}"). Forcing reload.`);
-				window.location.reload();
+			// Safety timeout: if page analysis doesn't start within 45s, try cache fallback
+			const safetyTimer = setTimeout(async () => {
+				console.error(`[Better Justel] Safety timeout: page analysis did not start within 45s (readyState: "${document.readyState}").`);
+				const cachedAct = await getStorage(ctx.act.eli);
+				if (cachedAct) {
+					console.log("[Better Justel] Falling back to cached version after safety timeout");
+					window.stop();
+					addLoading("Server unreachable — restoring page from offline database");
+					ctx.act = cachedAct;
+					await displayContent(false);
+				} else {
+					addLoading("Server unreachable and no cached version available. <a href='javascript:window.location.reload()'>Retry</a>");
+				}
 			}, 45000);
 
 			async function runAnalysis() {

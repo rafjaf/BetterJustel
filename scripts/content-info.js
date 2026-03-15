@@ -16,9 +16,8 @@ window.BJ.infoModule = function(ctx) {
 					`body children: ${document.body?.children?.length || 0}, title-1 exists: ${!!document.querySelector("div#list-title-1")})`);
 			}
 			if (_numacWaitMs >= 30000) {
-				console.error("[Better Justel] Timeout waiting for numac after 30s — forcing reload");
-				window.location.reload();
-				return;
+				console.error("[Better Justel] Timeout waiting for numac after 30s — aborting");
+				return { timeout: true };
 			}
 		}
 		console.log(`[Better Justel] Numac found: ${ctx.act.numac} (after ${_numacWaitMs}ms)`);

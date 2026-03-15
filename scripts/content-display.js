@@ -188,6 +188,15 @@ window.BJ.displayModule = function(ctx) {
 				div.style.display = "none";
 			}
 		});
+		// Hide margin annotations (Al., bookmarks) while text is selected
+		document.addEventListener("selectionchange", function() {
+			const sel = window.getSelection();
+			if (sel && sel.toString().length > 0) {
+				document.body.classList.add("has-selection");
+			} else {
+				document.body.classList.remove("has-selection");
+			}
+		});
 		// Set up highlighter
 		$("div#content").on("mouseup", ctx.manageHighlights );
 		$("div#content").append("<div id='toolbar' style='display: none;'><div class='circle yellow'></div><div class='circle green'></div><div class='circle blue'></div>"
