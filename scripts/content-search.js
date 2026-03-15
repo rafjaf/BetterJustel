@@ -1,7 +1,7 @@
 window.BJ = window.BJ || {};
 window.BJ.searchModule = function() {
 
-	function researchPage() {
+	function setupSearchForm() {
 		// Add buttons next to Nature juridique label
 		let newDiv = document.createElement('div');
 		newDiv.style.display = "flex";
@@ -43,14 +43,30 @@ window.BJ.searchModule = function() {
 		document.querySelector("div.search-form").insertBefore(
 			document.querySelector("div.search-form div:nth-of-type(6)"), 
 			document.querySelector("div.search-form div:nth-of-type(5)"));
+		// Submit the form when Enter is pressed in any input field
+		document.querySelector("form").addEventListener("keydown", function(event) {
+			if (event.key === "Enter") {
+				event.preventDefault();
+				document.querySelector("div.fod-search-button button").click();
+			}
+		});
+	}
+
+	function researchPage() {
+		setupSearchForm();
 		// Search in title of the act by default
 		document.querySelector("input#titel").checked = true;
 	}
 
 	function processResultsPage() {
-		if (document.readyState == "complete") {
+		if (document.readyState !== "loading") {
 			// Change target of each link to a new tab
 			document.querySelectorAll("div.list a[href]").forEach(a => a.target = "_blank");
+			// Re-apply search form improvements (field swap + shortcut buttons) since the
+			// search form is embedded in the results page too — including on the no-results page
+			if (document.querySelector("div.search-form")) {
+				setupSearchForm();
+			}
 		}
 		else {
 			document.addEventListener("DOMContentLoaded", processResultsPage);
