@@ -270,16 +270,19 @@ window.BJ.analyseModule = function(ctx) {
 		// Also correct p elements which contain articles 
 		const WRONG_LAST_NODENAME = ["ERRATUM,M.B.", "I", "BR&GT;<BR", "L", "P", "AR"];
 		let i = 0;
-		do {
-			// Using do ... while instead of forEach because the number of the elements of the array is affected by the loop
+		while (i < contentNodes.length) {
+			// Using a while loop because the number of elements changes when elements are replaced
 			let el = contentNodes[i];
 			if (WRONG_LAST_NODENAME.some(w => el.nodeName == w)) { 
 				console.log("Correcting wrong structure of the page at element", i, el);
 				let newArray = Array.from ( el.childNodes );
 				contentNodes.splice(i, 1, ...newArray );
+				// Do NOT increment i: re-check position i, which is now either the first
+				// inserted child (needs checking too) or the next element if this was empty.
+			} else {
+				i++;
 			}
-			i++;
-		} while (i != contentNodes.length);
+		}
 		// Anlyse each node depending on their type
 		for (let [index, n] of contentNodes.entries()) {
 			if ( (n.nodeName == "A") && (n.name) && (n.name.startsWith("LNK") && !(n.textContent.toLowerCase().startsWith("annexe")) ) ) {
@@ -325,8 +328,19 @@ window.BJ.analyseModule = function(ctx) {
 				if (lastNode.type == "article") {
 					if (lastNode.titleOngoing) {
 						// Text is part of the title of the article
-						// lastNode.text += (text[0] == "." ? "" : " ") + text;
-						lastNode.text += (text[0] == "." ? text : "");
+						// For last articles, the number is in a text node (no <a href> link)
+						let numMatch = text.match(/^\s?([A-Z]+|\d+\w*)((\.|\/|:|-)\d+)*\./);
+						if (numMatch) {
+							if (n.nextSibling?.nodeName === "BR") {
+								// The text node is the complete title line; capture it all and let beautify extract the article label
+								lastNode.text += text;
+							} else {
+								// Body text or amendment brackets follow; only capture the article number
+								lastNode.text += text.substring(0, numMatch.index + numMatch[0].length);
+							}
+						} else {
+							lastNode.text += (text[0] == "." ? text : "");
+						}
 						lastNode.content += n.textContent.replace(/</g, "&lt;");
 						// Correction for Art. 1
 						if (!lastNode.text && n.textContent.startsWith("Article")) {lastNode.text = "Art. ";}
@@ -404,8 +418,8 @@ window.BJ.analyseModule = function(ctx) {
 		}
 		if (lastNode) {
 			beautify(lastNode);
-			if ( (lastNode.type == "article") && (lastNode.text == "Art.") ) {
-				let correctText = lastNode.content.match(/(<div style='padding-left: -20px;'><b>)(.+)(<\/b>)/)?.[2];
+			if ( (lastNode.type == "article") && !lastNode.text.match(/Art\.?\s?[A-Z\d]/) ) {
+				let correctText = lastNode.content.match(/(<div style='padding-left: -20px;'><b>)(.+?)(<\/b>)/)?.[2];
 				if (correctText) {
 					lastNode.text = correctText;
 				}

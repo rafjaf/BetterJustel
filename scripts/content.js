@@ -82,14 +82,15 @@
 			 && cached.lastChecked == today ) {
 			// Already checked today — restore from cache without contacting eJustice
 			console.log(`[Better Justel] Already checked today (${today}) — restoring from cache`);
-			window.stop();
-			addLoading("Restoring page from offline database");
 			ctx.act = await getStorage(currentURL);
-			if (ctx.act) {
+			if (ctx.act?.content?.length) {
+				window.stop();
+				addLoading("Restoring page from offline database");
 				await displayContent(false);
 				return;
 			}
 			// Cache entry exists in updateInfo but act data missing — fall through to online check
+			ctx.act = {content: []};
 			console.warn("[Better Justel] Cache entry found but act data missing — falling back to online check");
 		}
 		// Identify act
@@ -99,7 +100,7 @@
 			console.warn("[Better Justel] Server timeout — attempting to restore from cache");
 			// Try to find a cached version for this URL
 			const cachedAct = await getStorage(currentURL);
-			if (cachedAct) {
+			if (cachedAct?.content?.length) {
 				window.stop();
 				addLoading("Server unreachable — restoring page from offline database");
 				ctx.act = cachedAct;
@@ -144,7 +145,7 @@
 			const safetyTimer = setTimeout(async () => {
 				console.error(`[Better Justel] Safety timeout: page analysis did not start within 45s (readyState: "${document.readyState}").`);
 				const cachedAct = await getStorage(ctx.act.eli);
-				if (cachedAct) {
+				if (cachedAct?.content?.length) {
 					console.log("[Better Justel] Falling back to cached version after safety timeout");
 					window.stop();
 					addLoading("Server unreachable — restoring page from offline database");
