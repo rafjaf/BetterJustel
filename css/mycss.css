@@ -555,9 +555,22 @@ div.caselaw-content a:hover {
 	text-decoration: underline;
 }
 
+div.caselaw-content li.caselaw-related {
+	color: #36079d;
+}
+
+div.caselaw-header span.caselaw-related-ref {
+	color: #36079d;
+}
+
 /* TOC: highlight articles that have case law */
 .jstree-default .jstree-anchor.has-caselaw {
 	background-color: #dfe6ed !important;
+	border-radius: 2px;
+}
+
+.jstree-default .jstree-anchor.has-caselaw-related-only {
+	background-color: #e8dff0 !important;
 	border-radius: 2px;
 }
 

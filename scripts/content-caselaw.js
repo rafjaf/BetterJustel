@@ -78,6 +78,21 @@ window.BJ.caselawModule = function(ctx) {
 	}
 
 	/**
+	 * Convert a full ELI URL to the corresponding Juportal Crawler filename.
+	 */
+	function eliUrlToFilename(eliUrl) {
+		try {
+			const url = new URL(eliUrl);
+			if (url.pathname.indexOf("/eli/") !== -1) {
+				return url.pathname.slice(1).replace(/\//g, "_") + ".json";
+			}
+			return null;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	/**
 	 * Sanitize JSON data to prevent code injection.
 	 * Only keep expected keys and types.
 	 */
@@ -87,6 +102,7 @@ window.BJ.caselawModule = function(ctx) {
 		}
 		const clean = {};
 		for (const articleKey of Object.keys(rawData)) {
+			if (articleKey === "related") continue; // Handled separately
 			// Article keys should be strings (numbers, possibly with bis/ter etc.)
 			if (typeof rawData[articleKey] !== "object" || rawData[articleKey] === null) continue;
 			clean[articleKey] = {};
@@ -118,6 +134,92 @@ window.BJ.caselawModule = function(ctx) {
 	}
 
 	/**
+	 * Sanitize and validate the "related" array from raw JSON data.
+	 */
+	function sanitizeRelatedInfo(rawRelated) {
+		if (!Array.isArray(rawRelated)) return [];
+		return rawRelated
+			.filter(r => typeof r === "object" && r !== null
+				&& typeof r.from === "string"
+				&& typeof r.fromELI === "string" && /^https?:\/\//.test(r.fromELI)
+				&& typeof r.articles === "object" && r.articles !== null)
+			.map(r => ({
+				from: r.from.replace(/<[^>]*>/g, ""),
+				fromELI: r.fromELI,
+				articles: Object.fromEntries(
+					Object.entries(r.articles)
+						.filter(([k, v]) => typeof k === "string" && Array.isArray(v))
+						.map(([k, v]) => [k, v.filter(a => typeof a === "string")])
+				)
+			}));
+	}
+
+	/**
+	 * Fetch case-law data for related ELIs, using per-ELI caching.
+	 * Returns { localArticle: [{ from, fromELI, remoteArticle, articleData }] }.
+	 */
+	async function fetchRelatedCaseLaw(relatedInfo) {
+		const result = {};
+
+		for (const rel of relatedInfo) {
+			const filename = eliUrlToFilename(rel.fromELI);
+			if (!filename) continue;
+
+			const relCaselawKey = "caselaw-" + rel.fromELI;
+			const relFetchInfoKey = "caselaw-fetch-" + rel.fromELI;
+
+			let relData = null;
+			const fetchInfo = await ctx.getStorage(relFetchInfoKey);
+			if (fetchInfo?.lastFetch && (Date.now() - fetchInfo.lastFetch) < FETCH_INTERVAL_MS) {
+				relData = await ctx.getStorage(relCaselawKey);
+			}
+
+			if (!relData) {
+				const url = GITHUB_RAW_BASE + filename;
+				console.log(`[Better Justel - Case Law] Fetching related case law: ${url}`);
+				try {
+					const resp = await fetch(url);
+					if (resp.ok) {
+						const rawText = await resp.text();
+						let rawData = JSON.parse(rawText);
+						delete rawData.related;
+						relData = sanitizeCaselawData(rawData);
+						if (relData) {
+							await ctx.setStorage(relCaselawKey, relData);
+						}
+						await ctx.setStorage(relFetchInfoKey, { lastFetch: Date.now() });
+					} else {
+						console.warn(`[Better Justel - Case Law] HTTP ${resp.status} fetching related case law from ${url}`);
+						if (resp.status === 404) {
+							await ctx.setStorage(relFetchInfoKey, { lastFetch: Date.now() });
+						}
+					}
+				} catch (e) {
+					console.warn(`[Better Justel - Case Law] Network error fetching related case law:`, e.message);
+				}
+			}
+
+			if (!relData) continue;
+
+			for (const [localArt, remoteArts] of Object.entries(rel.articles)) {
+				if (!result[localArt]) result[localArt] = [];
+				for (const remoteArt of remoteArts) {
+					if (relData[remoteArt]) {
+						result[localArt].push({
+							from: rel.from,
+							fromELI: rel.fromELI,
+							remoteArticle: remoteArt,
+							articleData: relData[remoteArt]
+						});
+					}
+				}
+			}
+		}
+
+		return result;
+	}
+
+	/**
 	 * Fetch case-law data from Juportal Crawler GitHub repo.
 	 * Caches in localStorage as "caselaw-{eli}" and throttles to once per day per ELI.
 	 * Returns the case-law data object, or null if none available.
@@ -126,6 +228,7 @@ window.BJ.caselawModule = function(ctx) {
 		const eli = ctx.act.eli;
 		const fetchInfoKey = "caselaw-fetch-" + eli;
 		const caselawKey = "caselaw-" + eli;
+		const relatedInfoKey = "caselaw-related-info-" + eli;
 
 		// Check if we already fetched recently (within 24h)
 		const fetchInfo = await ctx.getStorage(fetchInfoKey);
@@ -137,7 +240,8 @@ window.BJ.caselawModule = function(ctx) {
 				if (cached) {
 					console.log(`[Better Justel - Case Law] Using cached case-law data (${countAbstracts(cached)} abstracts)`);
 				}
-				return { data: cached || null, newAbstracts: 0, newArticles: 0 };
+				const relatedInfo = await ctx.getStorage(relatedInfoKey) || [];
+				return { data: cached || null, relatedInfo, newAbstracts: 0, newArticles: 0 };
 			}
 		}
 
@@ -145,7 +249,7 @@ window.BJ.caselawModule = function(ctx) {
 		const filename = getCaselawFilename();
 		if (!filename) {
 			console.log("[Better Justel - Case Law] Cannot determine Juportal Crawler filename for this act");
-			return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
+			return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
 		}
 
 		const url = GITHUB_RAW_BASE + filename;
@@ -163,7 +267,7 @@ window.BJ.caselawModule = function(ctx) {
 					// Do not update fetch timestamp for server errors — allow retry on next load
 				}
 				// Keep existing cached data, if any
-				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
+				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
 			}
 
 			const rawText = await response.text();
@@ -173,15 +277,19 @@ window.BJ.caselawModule = function(ctx) {
 			} catch (e) {
 				console.error("[Better Justel - Case Law] Invalid JSON received from Juportal Crawler:", e.message);
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
+				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
 			}
+
+			// Extract related info before sanitizing article data
+			const relatedInfo = sanitizeRelatedInfo(rawData.related);
+			delete rawData.related;
 
 			// Sanitize
 			const cleanData = sanitizeCaselawData(rawData);
 			if (!cleanData) {
 				console.error("[Better Justel - Case Law] Sanitization failed — data discarded");
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
+				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
 			}
 
 			// Check for updates vs cached version using deep comparison
@@ -192,7 +300,8 @@ window.BJ.caselawModule = function(ctx) {
 			if (cachedJSON === cleanJSON) {
 				console.log("[Better Justel - Case Law] No updates detected — data unchanged (deep comparison)");
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return { data: cleanData, newAbstracts: 0, newArticles: 0 };
+				await ctx.setStorage(relatedInfoKey, relatedInfo);
+				return { data: cleanData, relatedInfo, newAbstracts: 0, newArticles: 0 };
 			}
 
 			// Data has changed — replace entire cache
@@ -210,14 +319,15 @@ window.BJ.caselawModule = function(ctx) {
 			// Replace stored data entirely
 			await ctx.setStorage(caselawKey, cleanData);
 			await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
+			await ctx.setStorage(relatedInfoKey, relatedInfo);
 
-			return { data: cleanData, newAbstracts, newArticles };
+			return { data: cleanData, relatedInfo, newAbstracts, newArticles };
 		}
 		catch (e) {
 			console.error("[Better Justel - Case Law] Network error fetching case-law:", e.message);
 			// Do not update fetch timestamp on network error — allow retry on next load
 			// Keep existing cached data, if any
-			return { data: await ctx.getStorage(caselawKey) || null, newAbstracts: 0, newArticles: 0 };
+			return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
 		}
 	}
 
@@ -289,14 +399,33 @@ window.BJ.caselawModule = function(ctx) {
 	 * Deduplicates based on (normalizedAbstractText, roleNumber) — catches duplicates
 	 * regardless of whether they share the same ECLI or not.
 	 */
-	function buildCaselawHTML(articleData) {
-		// Collect all decisions and sort by date (most recent first)
+	function buildCaselawHTML(articleData, relatedEntries) {
+		// Collect main decisions
 		const decisions = Object.entries(articleData)
-			.map(([ecli, d]) => ({ ecli, ...d }))
-			.sort((a, b) => b.date.localeCompare(a.date));
+			.map(([ecli, d]) => ({ ecli, ...d, isRelated: false }));
+
+		// Add related decisions
+		if (relatedEntries) {
+			for (const rel of relatedEntries) {
+				for (const [ecli, d] of Object.entries(rel.articleData)) {
+					decisions.push({
+						ecli, ...d,
+						isRelated: true,
+						relatedFrom: rel.from,
+						relatedArticle: rel.remoteArticle
+					});
+				}
+			}
+		}
+
+		// Sort by date (most recent first)
+		decisions.sort((a, b) => b.date.localeCompare(a.date));
 
 		const seenKeys = new Set();
 		const items = [];
+		const relatedCountMap = {};
+		let originalCount = 0;
+
 		for (const d of decisions) {
 			// Choose FR abstracts by priority, NL as fallback
 			let abstracts = [];
@@ -320,11 +449,24 @@ window.BJ.caselawModule = function(ctx) {
 				const key = normalizeAbstract(abstract) + "\x00" + roleNumber;
 				if (seenKeys.has(key)) continue;
 				seenKeys.add(key);
-				items.push(`<li>${abstract} : ${citation}</li>`);
+				const liClass = d.isRelated ? ' class="caselaw-related"' : '';
+				items.push(`<li${liClass}>${abstract} : ${citation}</li>`);
+				if (d.isRelated) {
+					const relKey = d.relatedFrom + "\x00" + d.relatedArticle;
+					relatedCountMap[relKey] = (relatedCountMap[relKey] || 0) + 1;
+				} else {
+					originalCount++;
+				}
 			}
 		}
 
-		return items.length ? `<ol>${items.join("")}</ol>` : "";
+		const html = items.length ? `<ol>${items.join("")}</ol>` : "";
+		const relatedCounts = Object.entries(relatedCountMap).map(([key, count]) => {
+			const [from, remoteArticle] = key.split("\x00");
+			return { from, remoteArticle, count };
+		});
+
+		return { html, totalCount: items.length, originalCount, relatedCounts };
 	}
 
 	/**
@@ -361,29 +503,44 @@ window.BJ.caselawModule = function(ctx) {
 	/**
 	 * Inject case-law blocks under each article in the displayed content.
 	 */
-	function displayCaseLaw(caselawData) {
+	function displayCaseLaw(caselawData, relatedCaselaw) {
 		if (!caselawData) return;
+		relatedCaselaw = relatedCaselaw || {};
 
 		const articles = collectArticles(ctx.act.content);
 		let articlesWithCaselaw = 0;
 
 		for (const article of articles) {
 			const artNumber = extractArticleNumber(article.text);
-			if (!artNumber || !caselawData[artNumber]) continue;
+			if (!artNumber) continue;
 
-			const articleData = caselawData[artNumber];
-			const totalAbstracts = countUniqueAbstracts(articleData);
-			if (!totalAbstracts) continue;
+			const articleData = caselawData[artNumber] || {};
+			const relatedEntries = relatedCaselaw[artNumber] || [];
+			if (!Object.keys(articleData).length && !relatedEntries.length) continue;
 
-			const html = buildCaselawHTML(articleData);
+			const { html, totalCount, originalCount, relatedCounts } = buildCaselawHTML(articleData, relatedEntries);
 			if (!html) continue;
+
+			// Build header text
+			let headerText;
+			if (originalCount === 0) {
+				headerText = `<span class="caselaw-related-ref">Related case law (${totalCount}) on Article ${artNumber}</span>`;
+			} else {
+				headerText = `Case law (${originalCount}) on Article ${artNumber}`;
+				if (relatedCounts.length > 0) {
+					const parts = relatedCounts.map(r =>
+						`case law (${r.count}) on Article ${r.remoteArticle} of ${r.from}`
+					);
+					headerText += `<span class="caselaw-related-ref"> and ${parts.join(" and ")}</span>`;
+				}
+			}
 
 			const caselawBlock = document.createElement("div");
 			caselawBlock.classList.add("caselaw-block");
 			caselawBlock.innerHTML =
 				`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
 				`<div class="caselaw-header" role="button" tabindex="0">` +
-				`<span class="caselaw-toggle">▶</span> Case law (${totalAbstracts}) on Article ${artNumber}</div>` +
+				`<span class="caselaw-toggle">▶</span> ${headerText}</div>` +
 				`<div class="caselaw-content" style="display: none;">${html}</div>`;
 
 			// Insert after the article div
@@ -391,10 +548,14 @@ window.BJ.caselawModule = function(ctx) {
 			if (articleDiv) {
 				articleDiv.appendChild(caselawBlock);
 				articlesWithCaselaw++;
-				// Mark article in TOC as having case law (grey background)
+				// Mark article in TOC as having case law
 				const treeAnchor = document.getElementById(article.id + "_anchor");
 				if (treeAnchor) {
-					treeAnchor.classList.add("has-caselaw");
+					if (originalCount === 0) {
+						treeAnchor.classList.add("has-caselaw-related-only");
+					} else {
+						treeAnchor.classList.add("has-caselaw");
+					}
 				}
 			}
 		}
@@ -402,25 +563,22 @@ window.BJ.caselawModule = function(ctx) {
 		// Handle "general" case law (applies to the act as a whole)
 		if (caselawData["general"]) {
 			const generalData = caselawData["general"];
-			const totalGeneralAbstracts = countUniqueAbstracts(generalData);
-			if (totalGeneralAbstracts > 0) {
-				const html = buildCaselawHTML(generalData);
-				if (html) {
-					const generalBlock = document.createElement("div");
-					generalBlock.classList.add("caselaw-block");
-					generalBlock.innerHTML =
-						`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
-						`<div class="caselaw-header" role="button" tabindex="0">` +
-						`<span class="caselaw-toggle">▶</span> Case law (${totalGeneralAbstracts}) on this act as a whole</div>` +
-						`<div class="caselaw-content" style="display: none;">${html}</div>`;
+			const { html, totalCount } = buildCaselawHTML(generalData);
+			if (html) {
+				const generalBlock = document.createElement("div");
+				generalBlock.classList.add("caselaw-block");
+				generalBlock.innerHTML =
+					`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
+					`<div class="caselaw-header" role="button" tabindex="0">` +
+					`<span class="caselaw-toggle">▶</span> Case law (${totalCount}) on this act as a whole</div>` +
+					`<div class="caselaw-content" style="display: none;">${html}</div>`;
 
-					// Insert just under the first title of the document
-					const firstNode = ctx.act.content[0];
-					if (firstNode) {
-						const firstHeadingDiv = document.querySelector(`div#anchor_${firstNode.id}`);
-						if (firstHeadingDiv) {
-							firstHeadingDiv.insertAdjacentElement('afterend', generalBlock);
-						}
+				// Insert just under the first title of the document
+				const firstNode = ctx.act.content[0];
+				if (firstNode) {
+					const firstHeadingDiv = document.querySelector(`div#anchor_${firstNode.id}`);
+					if (firstHeadingDiv) {
+						firstHeadingDiv.insertAdjacentElement('afterend', generalBlock);
 					}
 				}
 			}
@@ -598,6 +756,7 @@ window.BJ.caselawModule = function(ctx) {
 		const eli = ctx.act.eli;
 		await ctx.setStorage("caselaw-fetch-" + eli, null);
 		await ctx.setStorage("caselaw-" + eli, null);
+		await ctx.setStorage("caselaw-related-info-" + eli, null);
 		console.log(`[Better Justel - Case Law] Cleared case-law data and fetch flag for ${eli}`);
 	}
 
@@ -606,9 +765,10 @@ window.BJ.caselawModule = function(ctx) {
 	 */
 	async function loadAndDisplayCaseLaw() {
 		try {
-			const { data: caselawData, newAbstracts, newArticles } = await fetchCaseLaw();
+			const { data: caselawData, relatedInfo, newAbstracts, newArticles } = await fetchCaseLaw();
+			const relatedCaselaw = relatedInfo.length ? await fetchRelatedCaseLaw(relatedInfo) : {};
 			if (caselawData && Object.keys(caselawData).length > 0) {
-				displayCaseLaw(caselawData);
+				displayCaseLaw(caselawData, relatedCaselaw);
 				// Load case-law highlights after blocks are injected
 				ctx.caselawHighlights = await loadCaselawHighlights();
 				if (newAbstracts > 0) {
