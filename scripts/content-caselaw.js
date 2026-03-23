@@ -767,8 +767,10 @@ window.BJ.caselawModule = function(ctx) {
 		try {
 			const { data: caselawData, relatedInfo, newAbstracts, newArticles } = await fetchCaseLaw();
 			const relatedCaselaw = relatedInfo.length ? await fetchRelatedCaseLaw(relatedInfo) : {};
-			if (caselawData && Object.keys(caselawData).length > 0) {
-				displayCaseLaw(caselawData, relatedCaselaw);
+			const hasDirectData = caselawData && Object.keys(caselawData).length > 0;
+			const hasRelatedData = Object.keys(relatedCaselaw).length > 0;
+			if (hasDirectData || hasRelatedData) {
+				displayCaseLaw(caselawData || {}, relatedCaselaw);
 				// Load case-law highlights after blocks are injected
 				ctx.caselawHighlights = await loadCaselawHighlights();
 				if (newAbstracts > 0) {
