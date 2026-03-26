@@ -122,20 +122,28 @@
 		// Now, check whether the latest version of the act is stored in the database
 		if ( (ctx.updateInfo[ctx.act.eli]?.script == chrome.runtime.getManifest().version)
 			 && (ctx.updateInfo[ctx.act.eli]?.act == ctx.act.lastUpdate) ) {
-			// Offline mode
-			// Page can be restored since it did not change (nor the script)
+			// Offline mode candidate — verify the cached data is actually present
 			console.log("[Better Justel] Using cached version (offline mode)");
-			window.stop();
-			addLoading("Restoring page from offline database");
-			ctx.act = await getStorage(ctx.act.eli);
-			// Record that we checked today
-			ctx.updateInfo[ctx.act.eli].lastChecked = today;
+			const cachedEli = ctx.act.eli;
+			const cachedAct = await getStorage(cachedEli);
+			if (cachedAct?.content?.length) {
+				window.stop();
+				addLoading("Restoring page from offline database");
+				ctx.act = cachedAct;
+				// Record that we checked today
+				ctx.updateInfo[cachedEli].lastChecked = today;
+				await setStorage("updateInfo", ctx.updateInfo);
+				await displayContent(false);
+				return;
+			}
+			// Cache is corrupted/incomplete — mark as stale and fall through to online mode
+			console.warn("[Better Justel] Cached act data missing or empty — forcing online reload");
+			ctx.updateInfo[cachedEli].act = false;
 			await setStorage("updateInfo", ctx.updateInfo);
-			await displayContent(false);
 		}
-		else {
-			// Online mode
-			// Page must be loaded and analysed since it cannot be restored
+		// Online mode
+		// Page must be loaded and analysed since it cannot be restored
+		{
 			console.log(`[Better Justel] Online mode — need to load and analyse page (readyState: "${document.readyState}", ` +
 				`cachedScript: ${ctx.updateInfo[ctx.act.eli]?.script || "none"}, currentScript: ${chrome.runtime.getManifest().version}, ` +
 				`cachedAct: ${ctx.updateInfo[ctx.act.eli]?.act || "none"}, currentAct: ${ctx.act.lastUpdate})`);
