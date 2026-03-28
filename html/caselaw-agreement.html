@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Better Justel – Enable Case Law Abstracts</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1.5rem 3rem;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: #222;
+      }
+      h1 { text-align: center; font-size: 1.4rem; }
+      .agreement-item {
+        margin: 1.5rem 0;
+        padding: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fafafa;
+      }
+      .agreement-item label {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        cursor: pointer;
+      }
+      .agreement-item input[type="checkbox"] {
+        margin-top: 0.2rem;
+        flex-shrink: 0;
+        width: 1.1rem;
+        height: 1.1rem;
+        cursor: pointer;
+      }
+      #licenseText {
+        display: block;
+        width: 100%;
+        height: 16rem;
+        margin-top: 0.75rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        resize: vertical;
+        background: #fff;
+        box-sizing: border-box;
+      }
+      #enableBtn {
+        display: block;
+        margin: 2rem auto 0;
+        padding: 0.6rem 2rem;
+        font-size: 1rem;
+        background: #00aacc;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #enableBtn:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+      #enableBtn:not(:disabled):hover {
+        background: #0088aa;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Better Justel – Enable Case Law Abstracts (EXPERIMENTAL)</h1>
+    <p>Before enabling this experimental feature, please read and agree to all three conditions below.
+       The "Enable display of case law" button will become active only once all checkboxes are checked. After clicking the button, you will need to reload open Better Justel pages.</p>
+
+    <div class="agreement-item">
+      <label>
+        <input type="checkbox" id="cb1">
+        <span>I agree that the use of this browser extension is governed by the GNU General Public License Version 3.</span>
+      </label>
+      <textarea id="licenseText" readonly></textarea>
+      <button id="downloadLicenseBtn" type="button" style="margin-top:0.5rem;">Download license</button>
+    </div>
+
+    <div class="agreement-item">
+      <label>
+        <input type="checkbox" id="cb2">
+        <span>I agree additionally that the use of this browser extension is governed by Belgian law and that any dispute pertaining to the validity, interpretation, performance or extinction of the license agreement, as well as more generally any dispute in connection with this browser extension, will be exclusively submitted to the courts having their seat in Nivelles (Belgium).</span>
+      </label>
+    </div>
+
+    <div class="agreement-item">
+      <label>
+        <input type="checkbox" id="cb3">
+        <span>I am aware that this browser extension is EXPERIMENTAL. In particular, the case law displayed has been automatically retrieved from Juportal by a program vibe-coded with the use of AI. Therefore, I am aware that relevant case law may be missing, misclassified, erroneously reported and/or outdated. I AGREE TO NEVER USE THE INFORMATION PROVIDED BY THIS BROWSER EXTENSION, ESPECIALLY FOR PROFESSIONAL USE, WITHOUT PERSONALLY VERIFYING IT.</span>
+      </label>
+    </div>
+
+    <button id="enableBtn" disabled>Enable display of case law</button>
+
+    <script src="../scripts/caselaw-agreement.js" type="module"></script>
+  </body>
+</html>

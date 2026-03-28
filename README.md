@@ -21,26 +21,26 @@ IMPORTANCE NOTICE: If you are using the Firefox extension, the first time you wi
 - When text is selected within an article in the right page, a popup window appears and allows to highlight the text (in yellow, green, blue or red) or to underline it (in violet). To edit an existing highlight, click on it : the color of it can be changed by clicking on another color, or deleted by clicking on the white circle. A comment can also be inserted. The popup window can be closed by clicking elsewhere in the right pane. When a comment is added to highlighted text, this text is displayed in italic.
 - Highlights are stored in the local storage of the browser and are restored the next time the same act is displayed. Saved highlights can be managed with the commands available in the popup window shown when clicking on the icon of the extension. They can be exported in JSON format and imported again by pasting the content of the JSON file in the relevant input box. A daily backup to Dropbox can also be set up (access is limited to the app folder in Dropbox, no access to the rest of the Dropbox is granted).
 - Acts displayed are automatically stored in the browser local storage. When visited again, the act loads much quicker (which is useful for very long texts such as the Code of Economic Law), unless it has been updated in the online database in the meanwhile. Stored acts can also be consulted offline: when no internet access is available, a user browsing to the ELI URL of a stored act will automatically be redirected to the offline version of it. The online or offline character of the text displayed is mentioned on top of the left pane. The list of stored acts can also be consulted by clicking on the icon of the extension (they are listed in chronological order). Highlights are also displayed and are editable when in offline mode.
-- Case law abstracts, downloaded from [Juportal Crawaler database](https://github.com/rafjaf/juportal_crawler/tree/main/data), are displayed under each article. Please note that these abstracts are in no way exhaustive, that they may be misclassified and that it does not in any way a systematic research on Juportal
+- Case law abstracts, downloaded from [Juportal Crawaler database](https://github.com/rafjaf/juportal_crawler/tree/main/data), are displayed under each article. Please note that these abstracts are in no way exhaustive, that important case law may be missing, that it may be misclassified or outdated and that it does not in any way replace a systematic research on Juportal and other databases. Never rely on this information, especially for professional use, without veryfing it personnally. Display of case law is experimental and is currently only open to beta testers.
 
 ## Terms and conditions
 
-The use of this extension is governed by the [GNU General Public License](LICENSE) and the laws of Belgium. Any dispute pertaining to this extension shall be exclusively submitted to the courts of Brussels (Belgium).
+The use of this browser extension is governed by the [GNU General Public License](LICENSE). This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+Additionnally, the use of this browser extension is governed by Belgian law and any dispute pertaining to the validity, interpretation, performance or extinction of the license agreement, as well as more generally any dispute in connection with this browser extension, will be exclusively submitted to the courts having their seat in Nivelles (Belgium).
 
 ## Known bugs and limitations
 
 - For the time being, the extension only works with the French version of Justel, to the exclusion of the Dutch version.
 - The HTML of some acts available on Justel is faulty and cannot therefore be displayed correctly.
-- This extension is still under development and may therefore still contain bugs or errors. Do not rely on it and always double-check the content of an act in official sources.
+- This extension is still under development, has been vibe-coded with the help of AI and may therefore contain bugs or errors. Do not rely on it, especially for professionnal use, and always double-check the content of an act in official sources.
 - Do not hesitate to report any problem or suggested improvement, and/or to contribute to the source code.
 
 ## Credits
 
-This extension was written by Rafaël Jafferali. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
+This extension was written by Rafaël Jafferali. 
 
 This extension was inspired by the very thorough userscript written by Naja Melan <https://userscripts-mirror.org/scripts/show/11725>.
 

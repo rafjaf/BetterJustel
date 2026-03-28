@@ -820,6 +820,12 @@ window.BJ.caselawModule = function(ctx) {
 	 */
 	async function loadAndDisplayCaseLaw() {
 		try {
+			// Check if the user has enabled the experimental case law feature
+			const caselawEnabled = await ctx.getStorage("caselawEnabled");
+			if (!caselawEnabled) {
+				console.log("[Better Justel - Case Law] Case law display is disabled. Enable it in the popup.");
+				return;
+			}
 			const { data: caselawData, relatedInfo, newAbstracts, newArticles, wasCached } = await fetchCaseLaw();
 			const relatedCaselaw = relatedInfo.length ? await fetchRelatedCaseLaw(relatedInfo, !wasCached) : {};
 			const hasDirectData = caselawData && Object.keys(caselawData).length > 0;

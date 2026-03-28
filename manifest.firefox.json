@@ -69,12 +69,15 @@
       "resources": [ 
 		"css/mycss.css",
 		"html/offline.html",
-		"images/fond5.jpg",
+		"html/caselaw-agreement.html",
+  	"images/fond5.jpg",
 		"images/jstree_32px.png",
 		"images/jstree_40px.png",
 		"images/jstree_throbber.gif",
 		"images/save.png",
-		"scripts/util.js"
+		"scripts/util.js",
+ 		"scripts/caselaw-agreement.js",
+		"LICENSE"
 	  ],
       "matches": [ 
 		"https://www.ejustice.just.fgov.be/*"

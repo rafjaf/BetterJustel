@@ -121,15 +121,21 @@ async function populateListOfStoredActs() {
 	document.querySelector("div#storedActs").innerHTML = table;
 	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", clearStorage));
 	document.querySelector("input#search").addEventListener("input", searchChange);
-	document.querySelector("a#clearSearch").addEventListener("click", () => {
+	document.querySelector("a#clearSearch").addEventListener("click", async () => {
 		document.querySelector("input#search").value = "";
-		searchChange();
+		await searchChange();
 	});
 }
 
-function searchChange(e) {
+async function searchChange(e) {
 	// Search for each term separated by a space
 	document.querySelector("a#clearSearch").style.display = document.querySelector("input#search").value ? "block" : "none";
+	// Easter egg: reveal case law section (only when not already enabled)
+	const searchVal = document.querySelector("input#search").value.toLowerCase().trim();
+	const caselawCurrentlyEnabled = await getStorage("caselawEnabled");
+	if (!caselawCurrentlyEnabled) {
+		document.querySelector("div#caselawSection").style.display = searchVal === "enable beta testing" ? "block" : "none";
+	}
 	let somethingFound = false;
 	document.querySelectorAll("tbody > tr").forEach(tr => {
 		let act = tr.querySelector("a").text.toLowerCase();
@@ -151,6 +157,31 @@ function searchChange(e) {
 	}
 }
 
+async function toggleCaseLaw() {
+	const enabled = await getStorage("caselawEnabled");
+	if (enabled) {
+		let choice = confirm("Press OK to disable case law abstracts. To re-enable, you will need to go through the agreement process again.");
+		if (choice) {
+			await setStorage("caselawEnabled", false);
+			updateCaselawLink(false);
+			document.querySelector("div#caselawSection").style.display = "none";
+		}
+	}
+	else {
+		chrome.tabs.create({ url: chrome.runtime.getURL("html/caselaw-agreement.html") });
+	}
+}
+
+function updateCaselawLink(enabled) {
+	const link = document.querySelector("a#toggleCaseLaw");
+	if (!link) return;
+	link.textContent = enabled ? "Disable case law abstracts (EXPERIMENTAL)" : "Enable case law abstracts (EXPERIMENTAL)";
+	// Always show the section when enabled so the user can disable it without the easter egg
+	if (enabled) {
+		document.querySelector("div#caselawSection").style.display = "block";
+	}
+}
+
 // Main
 let highlightsBackup = await getStorage("highlightsBackup") || {};
 if (highlightsBackup.accessToken) {
@@ -163,6 +194,14 @@ document.querySelector("a#toggleDropboxBackup").addEventListener("click", toggle
 document.querySelector("a#exportAllHighlights").addEventListener("click", exportAllHighlights);
 
 document.querySelector("span#version").innerText = chrome.runtime.getManifest().version;
+
+// Initialize case law link text based on current enabled state
+const caselawEnabled = await getStorage("caselawEnabled");
+updateCaselawLink(caselawEnabled);
+document.querySelector("a#toggleCaseLaw").addEventListener("click", async (e) => {
+	e.preventDefault();
+	await toggleCaseLaw();
+});
 
 populateListOfStoredActs();
 

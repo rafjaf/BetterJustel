@@ -1,17 +1,17 @@
 # Files ignored for the build of the extension
-.packageignore
-README.md
 .git/
 .github/
+.playwright-mcp/
 .vscode/
-node_modules/
-dist/
 build/
+dist/
+doc/
+node_modules/
 *.map
-.DS_Store
 *.zip
+.DS_Store
+.packageignore
 manifest.json
 manifest.chrome.json
 manifest.firefox.json
-LICENSE
-doc/
+README.md
