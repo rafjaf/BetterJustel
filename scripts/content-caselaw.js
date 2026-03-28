@@ -116,7 +116,11 @@ window.BJ.caselawModule = function(ctx) {
 					url: typeof decision.url === "string" && decision.url.match(/^https?:\/\//) ? decision.url : "",
 					abstractFR: null,
 					abstractNL: null,
-					relatedArticle: typeof decision.relatedArticle === "string" ? decision.relatedArticle.replace(/<[^>]*>/g, "") : null,
+					relatedArticle: typeof decision.relatedArticle === "string"
+						? decision.relatedArticle.replace(/<[^>]*>/g, "")
+						: Array.isArray(decision.relatedArticle)
+							? decision.relatedArticle.filter(a => typeof a === "string").map(a => a.replace(/<[^>]*>/g, ""))
+							: null,
 				};
 				if (Array.isArray(decision.abstractFR)) {
 					sanitizedDecision.abstractFR = decision.abstractFR
@@ -213,9 +217,13 @@ window.BJ.caselawModule = function(ctx) {
 			for (const [remoteArt, decisions] of Object.entries(relData)) {
 				for (const [ecli, decision] of Object.entries(decisions)) {
 					if (decision.relatedArticle) {
-						const localArt = decision.relatedArticle;
-						overridesByLocalArt[localArt] = overridesByLocalArt[localArt] || [];
-						overridesByLocalArt[localArt].push({ remoteArt, ecli, decision });
+						const localArts = Array.isArray(decision.relatedArticle)
+							? decision.relatedArticle
+							: [decision.relatedArticle];
+						for (const localArt of localArts) {
+							overridesByLocalArt[localArt] = overridesByLocalArt[localArt] || [];
+							overridesByLocalArt[localArt].push({ remoteArt, ecli, decision });
+						}
 						overriddenKeys.add(remoteArt + "\x00" + ecli);
 					}
 				}
