@@ -116,6 +116,7 @@ window.BJ.caselawModule = function(ctx) {
 					url: typeof decision.url === "string" && decision.url.match(/^https?:\/\//) ? decision.url : "",
 					abstractFR: null,
 					abstractNL: null,
+					relatedArticle: typeof decision.relatedArticle === "string" ? decision.relatedArticle.replace(/<[^>]*>/g, "") : null,
 				};
 				if (Array.isArray(decision.abstractFR)) {
 					sanitizedDecision.abstractFR = decision.abstractFR
@@ -158,7 +159,7 @@ window.BJ.caselawModule = function(ctx) {
 	 * Fetch case-law data for related ELIs, using per-ELI caching.
 	 * Returns { localArticle: [{ from, fromELI, remoteArticle, articleData }] }.
 	 */
-	async function fetchRelatedCaseLaw(relatedInfo) {
+	async function fetchRelatedCaseLaw(relatedInfo, forceFetch) {
 		const result = {};
 
 		for (const rel of relatedInfo) {
@@ -170,13 +171,16 @@ window.BJ.caselawModule = function(ctx) {
 
 			let relData = null;
 			const fetchInfo = await ctx.getStorage(relFetchInfoKey);
-			if (fetchInfo?.lastFetch && (Date.now() - fetchInfo.lastFetch) < FETCH_INTERVAL_MS) {
+			if (!forceFetch && fetchInfo?.lastFetch && (Date.now() - fetchInfo.lastFetch) < FETCH_INTERVAL_MS) {
 				relData = await ctx.getStorage(relCaselawKey);
+				if (relData) {
+					console.log(`[Better Justel - Case Law] Using cached case-law for related text: ${rel.fromELI}`);
+				}
 			}
 
 			if (!relData) {
 				const url = GITHUB_RAW_BASE + filename;
-				console.log(`[Better Justel - Case Law] Fetching related case law: ${url}`);
+				console.log(`[Better Justel - Case Law] Fetching related case law for ${rel.fromELI}: ${url}`);
 				try {
 					const resp = await fetch(url);
 					if (resp.ok) {
@@ -201,17 +205,60 @@ window.BJ.caselawModule = function(ctx) {
 
 			if (!relData) continue;
 
+			// Collect per-decision relatedArticle overrides.
+			// overriddenKeys: Set of "remoteArt\x00ecli" that must bypass the conversion table.
+			// overridesByLocalArt: localArt → { remoteArt, ecli, decision }[]
+			const overriddenKeys = new Set();
+			const overridesByLocalArt = {};
+			for (const [remoteArt, decisions] of Object.entries(relData)) {
+				for (const [ecli, decision] of Object.entries(decisions)) {
+					if (decision.relatedArticle) {
+						const localArt = decision.relatedArticle;
+						overridesByLocalArt[localArt] = overridesByLocalArt[localArt] || [];
+						overridesByLocalArt[localArt].push({ remoteArt, ecli, decision });
+						overriddenKeys.add(remoteArt + "\x00" + ecli);
+					}
+				}
+			}
+
+			// Apply conversion table, skipping decisions that have their own relatedArticle.
 			for (const [localArt, remoteArts] of Object.entries(rel.articles)) {
 				if (!result[localArt]) result[localArt] = [];
 				for (const remoteArt of remoteArts) {
 					if (relData[remoteArt]) {
-						result[localArt].push({
-							from: rel.from,
-							fromELI: rel.fromELI,
-							remoteArticle: remoteArt,
-							articleData: relData[remoteArt]
-						});
+						const filteredArticleData = {};
+						for (const [ecli, decision] of Object.entries(relData[remoteArt])) {
+							if (!overriddenKeys.has(remoteArt + "\x00" + ecli)) {
+								filteredArticleData[ecli] = decision;
+							}
+						}
+						if (Object.keys(filteredArticleData).length > 0) {
+							result[localArt].push({
+								from: rel.from,
+								fromELI: rel.fromELI,
+								remoteArticle: remoteArt,
+								articleData: filteredArticleData
+							});
+						}
 					}
+				}
+			}
+
+			// Apply per-decision overrides, grouped by remoteArt for display.
+			for (const [localArt, overrides] of Object.entries(overridesByLocalArt)) {
+				if (!result[localArt]) result[localArt] = [];
+				const byRemoteArt = {};
+				for (const { remoteArt, ecli, decision } of overrides) {
+					byRemoteArt[remoteArt] = byRemoteArt[remoteArt] || {};
+					byRemoteArt[remoteArt][ecli] = decision;
+				}
+				for (const [remoteArt, articleData] of Object.entries(byRemoteArt)) {
+					result[localArt].push({
+						from: rel.from,
+						fromELI: rel.fromELI,
+						remoteArticle: remoteArt,
+						articleData
+					});
 				}
 			}
 		}
@@ -241,7 +288,7 @@ window.BJ.caselawModule = function(ctx) {
 					console.log(`[Better Justel - Case Law] Using cached case-law data (${countAbstracts(cached)} abstracts)`);
 				}
 				const relatedInfo = await ctx.getStorage(relatedInfoKey) || [];
-				return { data: cached || null, relatedInfo, newAbstracts: 0, newArticles: 0 };
+				return { data: cached || null, relatedInfo, newAbstracts: 0, newArticles: 0, wasCached: true };
 			}
 		}
 
@@ -249,7 +296,7 @@ window.BJ.caselawModule = function(ctx) {
 		const filename = getCaselawFilename();
 		if (!filename) {
 			console.log("[Better Justel - Case Law] Cannot determine Juportal Crawler filename for this act");
-			return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
+			return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0, wasCached: false };
 		}
 
 		const url = GITHUB_RAW_BASE + filename;
@@ -267,7 +314,7 @@ window.BJ.caselawModule = function(ctx) {
 					// Do not update fetch timestamp for server errors — allow retry on next load
 				}
 				// Keep existing cached data, if any
-				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
+				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0, wasCached: false };
 			}
 
 			const rawText = await response.text();
@@ -277,7 +324,7 @@ window.BJ.caselawModule = function(ctx) {
 			} catch (e) {
 				console.error("[Better Justel - Case Law] Invalid JSON received from Juportal Crawler:", e.message);
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
+				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0, wasCached: false };
 			}
 
 			// Extract related info before sanitizing article data
@@ -289,7 +336,7 @@ window.BJ.caselawModule = function(ctx) {
 			if (!cleanData) {
 				console.error("[Better Justel - Case Law] Sanitization failed — data discarded");
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
-				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
+				return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0, wasCached: false };
 			}
 
 			// Check for updates vs cached version using deep comparison
@@ -301,7 +348,7 @@ window.BJ.caselawModule = function(ctx) {
 				console.log("[Better Justel - Case Law] No updates detected — data unchanged (deep comparison)");
 				await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
 				await ctx.setStorage(relatedInfoKey, relatedInfo);
-				return { data: cleanData, relatedInfo, newAbstracts: 0, newArticles: 0 };
+				return { data: cleanData, relatedInfo, newAbstracts: 0, newArticles: 0, wasCached: false };
 			}
 
 			// Data has changed — replace entire cache
@@ -321,13 +368,13 @@ window.BJ.caselawModule = function(ctx) {
 			await ctx.setStorage(fetchInfoKey, { lastFetch: Date.now() });
 			await ctx.setStorage(relatedInfoKey, relatedInfo);
 
-			return { data: cleanData, relatedInfo, newAbstracts, newArticles };
+			return { data: cleanData, relatedInfo, newAbstracts, newArticles, wasCached: false };
 		}
 		catch (e) {
 			console.error("[Better Justel - Case Law] Network error fetching case-law:", e.message);
 			// Do not update fetch timestamp on network error — allow retry on next load
 			// Keep existing cached data, if any
-			return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0 };
+			return { data: await ctx.getStorage(caselawKey) || null, relatedInfo: [], newAbstracts: 0, newArticles: 0, wasCached: false };
 		}
 	}
 
@@ -765,8 +812,8 @@ window.BJ.caselawModule = function(ctx) {
 	 */
 	async function loadAndDisplayCaseLaw() {
 		try {
-			const { data: caselawData, relatedInfo, newAbstracts, newArticles } = await fetchCaseLaw();
-			const relatedCaselaw = relatedInfo.length ? await fetchRelatedCaseLaw(relatedInfo) : {};
+			const { data: caselawData, relatedInfo, newAbstracts, newArticles, wasCached } = await fetchCaseLaw();
+			const relatedCaselaw = relatedInfo.length ? await fetchRelatedCaseLaw(relatedInfo, !wasCached) : {};
 			const hasDirectData = caselawData && Object.keys(caselawData).length > 0;
 			const hasRelatedData = Object.keys(relatedCaselaw).length > 0;
 			if (hasDirectData || hasRelatedData) {
