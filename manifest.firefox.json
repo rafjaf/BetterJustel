@@ -61,7 +61,9 @@
     }
   ],
   "host_permissions": [
-	"https://www.ejustice.just.fgov.be/eli/*",
+	"https://www.ejustice.just.fgov.be/eli/*"
+  ],
+  "optional_host_permissions": [
 	"https://raw.githubusercontent.com/rafjaf/juportal_crawler/main/data/*"
   ],
   "web_accessible_resources": [

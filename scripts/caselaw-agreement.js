@@ -33,6 +33,13 @@ cb2.addEventListener("change", updateButton);
 cb3.addEventListener("change", updateButton);
 
 enableBtn.addEventListener("click", async () => {
+	const granted = await chrome.permissions.request({
+		origins: ["https://raw.githubusercontent.com/rafjaf/juportal_crawler/main/data/*"]
+	});
+	if (!granted) {
+		alert("Permission was not granted. Case law will not be displayed until you grant access to raw.githubusercontent.com.");
+		return;
+	}
 	await setStorage("caselawEnabled", true);
 	window.close();
 });
