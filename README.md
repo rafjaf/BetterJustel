@@ -93,3 +93,4 @@ It makes use of the following open source libraries :
 	- content.js split in several smaller files for better readability
 - Version 0.3.2026.0215 : fixing issue https://github.com/rafjaf/BetterJustel/issues/3
 - Version 0.4 : implementation of case law abstracts under each article, downloaded from [Juportal Crawaler database](https://github.com/rafjaf/juportal_crawler/tree/main/data)
+- Version 0.4.1 : fixed cached/restored acts getting stuck on "Loading ..." in the table of contents when Justel's Content Security Policy blocks jsTree's Blob worker

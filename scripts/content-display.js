@@ -109,6 +109,7 @@ window.BJ.displayModule = function(ctx) {
 		$("div#jstree").jstree({"core":
 								{
 									"data": ctx.act.content,
+									"worker": false,
 								},
 								"plugins": [ "types" ],
 								"types": {
