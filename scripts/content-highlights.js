@@ -17,43 +17,81 @@ window.BJ.highlightsModule = function(ctx) {
 			return $("<div>").text(text).html();
 		}
 		function linkifyUrls(text) {
-			const urlRegex = /(?:(?:https?|ftp|file):\/\/|www\.)[^\s<>"']*[^\s<>"'.,\])]/gi;
+			const urlRegex = /(?:(?:https?|ftp):\/\/[^\s<>"']+|file:\/\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;
 			const plainText = String(text || "");
 			let html = "";
 			let lastIndex = 0;
 			plainText.replace(urlRegex, function(url, offset) {
+				const trimmedUrl = url.replace(/[.,\])]+$/g, "");
+				const trailingText = url.slice(trimmedUrl.length);
 				html += escapeHtml(plainText.slice(lastIndex, offset));
-				const href = /^www\./i.test(url) ? `http://${url}` : url;
-				html += `<a href="${escapeHtml(href)}">${escapeHtml(url)}</a>`;
+				const href = /^www\./i.test(trimmedUrl) ? `http://${trimmedUrl}` : trimmedUrl;
+				html += `<a href="${escapeHtml(href)}">${escapeHtml(trimmedUrl)}</a>`;
+				html += escapeHtml(trailingText);
 				lastIndex = offset + url.length;
 				return url;
 			});
 			html += escapeHtml(plainText.slice(lastIndex));
 			return html;
 		}
-		function addAnnotationResizeHandles(annotation) {
-			if (annotation.dataset.resizeHandlesReady) { return; }
-			annotation.dataset.resizeHandlesReady = "true";
+		function openLink(url) {
+			if (/^file:\/\//i.test(url)) {
+				chrome.runtime.sendMessage({ action: "openUrl", url });
+				return;
+			}
+			window.open(url, "_blank");
+		}
+		function handleAnnotationClick(event) {
+			const link = event.target.closest("a");
+			if (!link) { return; }
 
-			const handles = ["n", "e", "s", "w", "ne", "se", "sw", "nw"];
-			for (const direction of handles) {
-				const handle = document.createElement("span");
-				handle.className = `annotation-resize-handle ${direction}`;
-				handle.contentEditable = "false";
-				handle.dataset.direction = direction;
-				handle.addEventListener("mousedown", event => event.stopPropagation());
-				handle.addEventListener("mouseup", event => event.stopPropagation());
-				handle.addEventListener("pointerdown", startAnnotationResize);
-				annotation.appendChild(handle);
+			event.preventDefault();
+			event.stopPropagation();
+			openLink(link.href);
+		}
+		function getAnnotationResizeDirection(event) {
+			const annotation = event.currentTarget;
+			const resizeZone = 7;
+			const rect = annotation.getBoundingClientRect();
+			const onNorth = event.clientY - rect.top <= resizeZone;
+			const onEast = rect.right - event.clientX <= resizeZone;
+			const onSouth = rect.bottom - event.clientY <= resizeZone;
+			const onWest = event.clientX - rect.left <= resizeZone;
+
+			return `${onNorth ? "n" : ""}${onSouth ? "s" : ""}${onEast ? "e" : ""}${onWest ? "w" : ""}`;
+		}
+		function getAnnotationResizeCursor(direction) {
+			if (direction == "ne" || direction == "sw") { return "nesw-resize"; }
+			if (direction == "nw" || direction == "se") { return "nwse-resize"; }
+			if (direction == "n" || direction == "s") { return "ns-resize"; }
+			if (direction == "e" || direction == "w") { return "ew-resize"; }
+			return "";
+		}
+		function addAnnotationResize(annotation) {
+			if (annotation.dataset.resizeReady) { return; }
+			annotation.dataset.resizeReady = "true";
+			annotation.addEventListener("click", handleAnnotationClick);
+			annotation.addEventListener("pointermove", setAnnotationResizeCursor);
+			annotation.addEventListener("pointerleave", clearAnnotationResizeCursor);
+			annotation.addEventListener("pointerdown", startAnnotationResize);
+		}
+		function setAnnotationResizeCursor(event) {
+			const direction = getAnnotationResizeDirection(event);
+			event.currentTarget.style.cursor = getAnnotationResizeCursor(direction);
+		}
+		function clearAnnotationResizeCursor(event) {
+			if (!event.currentTarget.classList.contains("resizing")) {
+				event.currentTarget.style.cursor = "";
 			}
 		}
 		function startAnnotationResize(event) {
+			const direction = getAnnotationResizeDirection(event);
+			if (!direction) { return; }
+
 			event.preventDefault();
 			event.stopPropagation();
 
-			const handle = event.currentTarget;
-			const annotation = handle.closest("annotation");
-			const direction = handle.dataset.direction;
+			const annotation = event.currentTarget;
 			const minWidth = parseFloat(getComputedStyle(annotation).minWidth) || 120;
 			const minHeight = parseFloat(getComputedStyle(annotation).minHeight) || 60;
 			const startX = event.clientX;
@@ -63,8 +101,9 @@ window.BJ.highlightsModule = function(ctx) {
 			const startLeft = parseFloat(annotation.style.left) || annotation.offsetLeft;
 			const startTop = parseFloat(annotation.style.top) || annotation.offsetTop;
 
-			handle.setPointerCapture(event.pointerId);
+			annotation.setPointerCapture(event.pointerId);
 			annotation.classList.add("resizing");
+			annotation.style.cursor = getAnnotationResizeCursor(direction);
 
 			function resize(moveEvent) {
 				const dx = moveEvent.clientX - startX;
@@ -98,20 +137,20 @@ window.BJ.highlightsModule = function(ctx) {
 				upEvent.preventDefault();
 				upEvent.stopPropagation();
 				annotation.classList.remove("resizing");
-				handle.releasePointerCapture(event.pointerId);
-				handle.removeEventListener("pointermove", resize);
-				handle.removeEventListener("pointerup", stopResize);
-				handle.removeEventListener("pointercancel", stopResize);
+				annotation.style.cursor = "";
+				annotation.releasePointerCapture(event.pointerId);
+				annotation.removeEventListener("pointermove", resize);
+				annotation.removeEventListener("pointerup", stopResize);
+				annotation.removeEventListener("pointercancel", stopResize);
 			}
 
-			handle.addEventListener("pointermove", resize);
-			handle.addEventListener("pointerup", stopResize);
-			handle.addEventListener("pointercancel", stopResize);
+			annotation.addEventListener("pointermove", resize);
+			annotation.addEventListener("pointerup", stopResize);
+			annotation.addEventListener("pointercancel", stopResize);
 		}
 		function renderAnnotation(annotation, text) {
 			annotation.innerHTML = linkifyUrls(text);
-			annotation.removeAttribute("data-resize-handles-ready");
-			addAnnotationResizeHandles(annotation);
+			addAnnotationResize(annotation);
 		}
 		let s = document.getSelection();
 		let beginParentArticle = $(s.anchorNode).parents(".article");
@@ -230,13 +269,18 @@ window.BJ.highlightsModule = function(ctx) {
 					annotationText = linkifyUrls(annotationText);
 					$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
 										   +`contenteditable="true">${annotationText}</annotation>`);
-					addAnnotationResizeHandles(document.querySelector(`annotation#${event.target.id}`));
+					addAnnotationResize(document.querySelector(`annotation#${event.target.id}`));
 				}
 				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`}).show();
 			}
 			else if (event.target.nodeName == "A") {
 				// Activate the link;
-				window.open(event.target.href, '_blank');
+				if (event.target.closest("annotation")) {
+					event.preventDefault();
+					event.stopPropagation();
+				} else {
+					openLink(event.target.href);
+				}
 			}
 			else if (event.target.nodeName == "SPAN" && event.target.classList.contains("bookmark")) {
 				// Click on bookmark
