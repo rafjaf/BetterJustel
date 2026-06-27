@@ -3,6 +3,33 @@ const DROPBOX_REDIRECT_URL = "https://www.ejustice.just.fgov.be/eli/";
 
 import {getStorage, setStorage, getAllHighlights} from "../scripts/util.js";
 
+function getDownload() {
+	if (typeof window.download !== "function") {
+		throw new Error("Download library is not loaded");
+	}
+	return window.download;
+}
+
+function getDropbox() {
+	if (!window.Dropbox?.DropboxAuth) {
+		throw new Error("Dropbox SDK is not loaded");
+	}
+	return window.Dropbox;
+}
+
+function runPopupCommand(handler) {
+	return async function(event) {
+		event.preventDefault();
+		try {
+			await handler(event);
+		}
+		catch (e) {
+			console.error(e);
+			alert(e.message || "The command failed");
+		}
+	};
+}
+
 async function importHighlights() {
 	// Let the user pick a JSON file instead of pasting raw JSON
 	const fileList = await new Promise(resolve => {
@@ -11,7 +38,10 @@ async function importHighlights() {
 		el.accept = '.json,application/json';
 		el.style.display = 'none';
 		document.body.appendChild(el);
-		el.addEventListener('change', () => resolve(el.files), { once: true });
+		el.addEventListener('change', () => {
+			resolve(el.files);
+			el.remove();
+		}, { once: true });
 		el.click();
 	});
 	const file = fileList && fileList[0];
@@ -54,10 +84,13 @@ async function toggleDropboxBackup() {
 		}
 	}
 	else {
+		const Dropbox = getDropbox();
 		let dbxAuth = new Dropbox.DropboxAuth({
 			clientId: DROPBOX_CLIENT_ID,
 		});
 		highlightsBackup.filename = prompt("Please enter the file name of backups", "Highlights Backup");
+		if (!highlightsBackup.filename?.trim()) { return; }
+		highlightsBackup.filename = highlightsBackup.filename.trim();
 		alert("You will now be redirected to authorize this app to access your Dropbox. Access is only requested to a folder dedicated to this app. No access will be granted to the rest of your Dropbox. Backups of your highlights will be made daily.");
 		let authUrl = await dbxAuth.getAuthenticationUrl(DROPBOX_REDIRECT_URL, undefined, 'code', 'offline', undefined, undefined, true);
 		highlightsBackup.codeVerifier = dbxAuth.codeVerifier;
@@ -70,8 +103,8 @@ async function toggleDropboxBackup() {
 }
 
 async function exportAllHighlights() {
-	let data = await getAllHighlights();
-	download(data, "Exported highlights.json", "application/json");
+	let data = await getAllHighlights({pretty: true});
+	getDownload()(data, "Exported highlights.json", "application/json");
 }
 
 async function populateListOfStoredActs() {
@@ -119,12 +152,12 @@ async function populateListOfStoredActs() {
 	// Display table
 	document.querySelector("div#noStoredActs").style.display = "none";
 	document.querySelector("div#storedActs").innerHTML = table;
-	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", clearStorage));
+	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", runPopupCommand(clearStorage)));
 	document.querySelector("input#search").addEventListener("input", searchChange);
-	document.querySelector("a#clearSearch").addEventListener("click", async () => {
+	document.querySelector("a#clearSearch").addEventListener("click", runPopupCommand(async () => {
 		document.querySelector("input#search").value = "";
 		await searchChange();
-	});
+	}));
 }
 
 async function searchChange(e) {
@@ -189,19 +222,15 @@ if (highlightsBackup.accessToken) {
 }
 
 
-document.querySelector("a#importHighlights").addEventListener("click", importHighlights);
-document.querySelector("a#toggleDropboxBackup").addEventListener("click", toggleDropboxBackup);
-document.querySelector("a#exportAllHighlights").addEventListener("click", exportAllHighlights);
+document.querySelector("a#importHighlights").addEventListener("click", runPopupCommand(importHighlights));
+document.querySelector("a#toggleDropboxBackup").addEventListener("click", runPopupCommand(toggleDropboxBackup));
+document.querySelector("a#exportAllHighlights").addEventListener("click", runPopupCommand(exportAllHighlights));
 
 document.querySelector("span#version").innerText = chrome.runtime.getManifest().version;
 
 // Initialize case law link text based on current enabled state
 const caselawEnabled = await getStorage("caselawEnabled");
 updateCaselawLink(caselawEnabled);
-document.querySelector("a#toggleCaseLaw").addEventListener("click", async (e) => {
-	e.preventDefault();
-	await toggleCaseLaw();
-});
+document.querySelector("a#toggleCaseLaw").addEventListener("click", runPopupCommand(toggleCaseLaw));
 
 populateListOfStoredActs();
-

@@ -21,7 +21,7 @@ export async function setStorage(key, value) {
 	}
 }
 
-export async function getAllHighlights() {
+export async function getAllHighlights(options = {}) {
 	let data = {};
 	let allStorage = await chrome.storage.local.get(null);
 	for (const key in allStorage) {
@@ -29,5 +29,5 @@ export async function getAllHighlights() {
 			data[key] = allStorage[key];
 		}
 	}
-	return JSON.stringify(data);
+	return JSON.stringify(data, null, options.pretty ? 2 : 0);
 }

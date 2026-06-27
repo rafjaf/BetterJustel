@@ -321,6 +321,8 @@ annotation {
 	border: 1px solid grey;
 	width: 195px;
 	height: 100px;
+	min-width: 120px;
+	min-height: 60px;
 	padding: 5px;
 	font-size: small;
 	position: absolute;
@@ -329,6 +331,80 @@ annotation {
 
 annotation a {
 	cursor: pointer;
+}
+
+annotation.resizing {
+	user-select: none;
+}
+
+annotation .annotation-resize-handle {
+	position: absolute;
+	display: block;
+	z-index: 1;
+}
+
+annotation .annotation-resize-handle.n,
+annotation .annotation-resize-handle.s {
+	left: 8px;
+	right: 8px;
+	height: 6px;
+	cursor: ns-resize;
+}
+
+annotation .annotation-resize-handle.e,
+annotation .annotation-resize-handle.w {
+	top: 8px;
+	bottom: 8px;
+	width: 6px;
+	cursor: ew-resize;
+}
+
+annotation .annotation-resize-handle.n {
+	top: -3px;
+}
+
+annotation .annotation-resize-handle.e {
+	right: -3px;
+}
+
+annotation .annotation-resize-handle.s {
+	bottom: -3px;
+}
+
+annotation .annotation-resize-handle.w {
+	left: -3px;
+}
+
+annotation .annotation-resize-handle.ne,
+annotation .annotation-resize-handle.se,
+annotation .annotation-resize-handle.sw,
+annotation .annotation-resize-handle.nw {
+	width: 10px;
+	height: 10px;
+}
+
+annotation .annotation-resize-handle.ne {
+	top: -5px;
+	right: -5px;
+	cursor: nesw-resize;
+}
+
+annotation .annotation-resize-handle.se {
+	right: -5px;
+	bottom: -5px;
+	cursor: nwse-resize;
+}
+
+annotation .annotation-resize-handle.sw {
+	bottom: -5px;
+	left: -5px;
+	cursor: nesw-resize;
+}
+
+annotation .annotation-resize-handle.nw {
+	top: -5px;
+	left: -5px;
+	cursor: nwse-resize;
 }
 
 .yellow {
@@ -573,4 +649,3 @@ div.caselaw-header span.caselaw-related-ref {
 	background-color: #e8dff0 !important;
 	border-radius: 2px;
 }
-

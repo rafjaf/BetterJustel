@@ -556,6 +556,32 @@ window.BJ.caselawModule = function(ctx) {
 	}
 
 	/**
+	 * Mark a jsTree article node as having case law.
+	 * jsTree may rebuild anchor elements when folders are collapsed/expanded, so
+	 * the class must live in the node model as well as on the current DOM anchor.
+	 */
+	function markTocArticleWithCaselaw(articleId, className) {
+		const classNames = ["has-caselaw", "has-caselaw-related-only"];
+		const treeAnchor = document.getElementById(articleId + "_anchor");
+		if (treeAnchor) {
+			treeAnchor.classList.remove(...classNames);
+			treeAnchor.classList.add(className);
+		}
+
+		const tree = $("div#jstree").jstree(true);
+		if (!tree) return;
+
+		const node = tree.get_node(articleId);
+		if (!node) return;
+
+		node.a_attr = node.a_attr || {};
+		const classes = new Set((node.a_attr.class || "").split(/\s+/).filter(Boolean));
+		classNames.forEach(c => classes.delete(c));
+		classes.add(className);
+		node.a_attr.class = Array.from(classes).join(" ");
+	}
+
+	/**
 	 * Inject case-law blocks under each article in the displayed content.
 	 */
 	function displayCaseLaw(caselawData, relatedCaselaw) {
@@ -604,14 +630,10 @@ window.BJ.caselawModule = function(ctx) {
 				articleDiv.appendChild(caselawBlock);
 				articlesWithCaselaw++;
 				// Mark article in TOC as having case law
-				const treeAnchor = document.getElementById(article.id + "_anchor");
-				if (treeAnchor) {
-					if (originalCount === 0) {
-						treeAnchor.classList.add("has-caselaw-related-only");
-					} else {
-						treeAnchor.classList.add("has-caselaw");
-					}
-				}
+				markTocArticleWithCaselaw(
+					article.id,
+					originalCount === 0 ? "has-caselaw-related-only" : "has-caselaw"
+				);
 			}
 		}
 

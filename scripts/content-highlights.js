@@ -13,10 +13,105 @@ window.BJ.highlightsModule = function(ctx) {
 			let i = ctx.highlights.quotes[articleText].findIndex(el => el.id == h.id);
 			return [currentArticle, articleText, i, false];
 		}
+		function escapeHtml(text) {
+			return $("<div>").text(text).html();
+		}
 		function linkifyUrls(text) {
-			const urlRegex = /(?:(?:https?|ftp):\/\/|www\.)[^\s/$.?#].[^\s]*[^\s.,\])]/gi;
-			return text.replace(urlRegex, url => `<a href="${url}">${url}</a>`);
+			const urlRegex = /(?:(?:https?|ftp|file):\/\/|www\.)[^\s<>"']*[^\s<>"'.,\])]/gi;
+			const plainText = String(text || "");
+			let html = "";
+			let lastIndex = 0;
+			plainText.replace(urlRegex, function(url, offset) {
+				html += escapeHtml(plainText.slice(lastIndex, offset));
+				const href = /^www\./i.test(url) ? `http://${url}` : url;
+				html += `<a href="${escapeHtml(href)}">${escapeHtml(url)}</a>`;
+				lastIndex = offset + url.length;
+				return url;
+			});
+			html += escapeHtml(plainText.slice(lastIndex));
+			return html;
+		}
+		function addAnnotationResizeHandles(annotation) {
+			if (annotation.dataset.resizeHandlesReady) { return; }
+			annotation.dataset.resizeHandlesReady = "true";
 
+			const handles = ["n", "e", "s", "w", "ne", "se", "sw", "nw"];
+			for (const direction of handles) {
+				const handle = document.createElement("span");
+				handle.className = `annotation-resize-handle ${direction}`;
+				handle.contentEditable = "false";
+				handle.dataset.direction = direction;
+				handle.addEventListener("mousedown", event => event.stopPropagation());
+				handle.addEventListener("mouseup", event => event.stopPropagation());
+				handle.addEventListener("pointerdown", startAnnotationResize);
+				annotation.appendChild(handle);
+			}
+		}
+		function startAnnotationResize(event) {
+			event.preventDefault();
+			event.stopPropagation();
+
+			const handle = event.currentTarget;
+			const annotation = handle.closest("annotation");
+			const direction = handle.dataset.direction;
+			const minWidth = parseFloat(getComputedStyle(annotation).minWidth) || 120;
+			const minHeight = parseFloat(getComputedStyle(annotation).minHeight) || 60;
+			const startX = event.clientX;
+			const startY = event.clientY;
+			const startWidth = annotation.offsetWidth;
+			const startHeight = annotation.offsetHeight;
+			const startLeft = parseFloat(annotation.style.left) || annotation.offsetLeft;
+			const startTop = parseFloat(annotation.style.top) || annotation.offsetTop;
+
+			handle.setPointerCapture(event.pointerId);
+			annotation.classList.add("resizing");
+
+			function resize(moveEvent) {
+				const dx = moveEvent.clientX - startX;
+				const dy = moveEvent.clientY - startY;
+				let width = startWidth;
+				let height = startHeight;
+				let left = startLeft;
+				let top = startTop;
+
+				if (direction.includes("e")) {
+					width = Math.max(minWidth, startWidth + dx);
+				}
+				if (direction.includes("s")) {
+					height = Math.max(minHeight, startHeight + dy);
+				}
+				if (direction.includes("w")) {
+					width = Math.max(minWidth, startWidth - dx);
+					left = startLeft + startWidth - width;
+				}
+				if (direction.includes("n")) {
+					height = Math.max(minHeight, startHeight - dy);
+					top = startTop + startHeight - height;
+				}
+
+				annotation.style.width = `${width}px`;
+				annotation.style.height = `${height}px`;
+				annotation.style.left = `${left}px`;
+				annotation.style.top = `${top}px`;
+			}
+			function stopResize(upEvent) {
+				upEvent.preventDefault();
+				upEvent.stopPropagation();
+				annotation.classList.remove("resizing");
+				handle.releasePointerCapture(event.pointerId);
+				handle.removeEventListener("pointermove", resize);
+				handle.removeEventListener("pointerup", stopResize);
+				handle.removeEventListener("pointercancel", stopResize);
+			}
+
+			handle.addEventListener("pointermove", resize);
+			handle.addEventListener("pointerup", stopResize);
+			handle.addEventListener("pointercancel", stopResize);
+		}
+		function renderAnnotation(annotation, text) {
+			annotation.innerHTML = linkifyUrls(text);
+			annotation.removeAttribute("data-resize-handles-ready");
+			addAnnotationResizeHandles(annotation);
 		}
 		let s = document.getSelection();
 		let beginParentArticle = $(s.anchorNode).parents(".article");
@@ -132,10 +227,10 @@ window.BJ.highlightsModule = function(ctx) {
 					} else {
 						annotationText = ctx.highlights.quotes[articleText][i]?.annotation || "";
 					}
-					const urlRegex = /(?:(?:https?|ftp):\/\/|www\.)[^\s/$.?#].[^\s]*[^\s.,\])]/gi;
 					annotationText = linkifyUrls(annotationText);
 					$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
 										   +`contenteditable="true">${annotationText}</annotation>`);
+					addAnnotationResizeHandles(document.querySelector(`annotation#${event.target.id}`));
 				}
 				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`}).show();
 			}
@@ -164,7 +259,7 @@ window.BJ.highlightsModule = function(ctx) {
 				}
 				updateBookmarkBar();
 			}
-			else if (event.target.nodeName != "ANNOTATION") {
+			else if (!event.target.closest("annotation")) {
 				// else erase highlight selection, hide annotation and toolbar
 				ctx.currentRange = null;
 				ctx.currentArticle = null;
@@ -192,7 +287,7 @@ window.BJ.highlightsModule = function(ctx) {
 							if (currentAnnotation) {
 								let annotation = $(`annotation#${h.id}`).text()
 								ctx.highlights.quotes[articleText][i].annotation = annotation;
-								$(`annotation#${h.id}`).html(linkifyUrls(annotation));							
+								renderAnnotation(document.querySelector(`annotation#${h.id}`), annotation);
 								h.classList.add("annotated");
 							}
 							else {
