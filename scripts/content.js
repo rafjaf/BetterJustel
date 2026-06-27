@@ -43,6 +43,25 @@
 
 	const {displayContent} = BJ.displayModule(ctx);
 
+	function showLoadingError() {
+		const loading = document.querySelector("div#loading");
+		if (!loading) { return; }
+		const retryUrl = window.location.origin + window.location.pathname
+			+ `${window.location.search ? window.location.search + "&" : "?"}noJS=true`;
+		const link = document.createElement("a");
+		link.href = retryUrl;
+		link.textContent = "here";
+		loading.replaceChildren(
+			document.createTextNode("Error while loading, click "),
+			link,
+			document.createTextNode(" to disable the extension or reload the page")
+		);
+	}
+
+	function showPageError(message) {
+		document.body.replaceChildren(document.createTextNode(message));
+	}
+
 	const {researchPage, processResultsPage} = BJ.searchModule();
 
 	async function analyseAct() {
@@ -63,8 +82,7 @@
 			await setStorage("updateInfo", ctx.updateInfo);
 		}
 		catch(e) {
-			document.querySelector("div#loading").innerHTML = `Error while loading, click <a href=${window.location.origin + window.location.pathname}`
-				+`${window.location.search ? window.location.search + "&" : "?"}noJS=true>here</a> to disable the extension or reload the page`;
+			showLoadingError();
 			console.error(e.message);
 			throw e;
 		}
@@ -223,7 +241,7 @@
 		let u = new URLSearchParams(window.location.search);
 		let eli = u.get("eli");
 		if (!eli) {
-			document.write("Error, you shouldn't access this page directly")
+			showPageError("Error, you shouldn't access this page directly");
 		}
 		else {
 			if (navigator.onLine) {
@@ -238,7 +256,7 @@
 				await displayContent(false);
 			}
 			else {
-				document.write(`Error, ${eli} has not been stored in the offline database`);
+				showPageError(`Error, ${eli} has not been stored in the offline database`);
 			}
 		}
 	}

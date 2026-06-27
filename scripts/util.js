@@ -31,3 +31,22 @@ export async function getAllHighlights(options = {}) {
 	}
 	return JSON.stringify(data, null, options.pretty ? 2 : 0);
 }
+
+export async function requestDataCollectionPermissions(dataTypes) {
+	if (!globalThis.browser?.permissions) {
+		return true;
+	}
+
+	const permissions = await browser.permissions.getAll();
+	if (!Object.prototype.hasOwnProperty.call(permissions, "data_collection")) {
+		return true;
+	}
+
+	const granted = permissions.data_collection || [];
+	const missing = dataTypes.filter(dataType => !granted.includes(dataType));
+	if (!missing.length) {
+		return true;
+	}
+
+	return browser.permissions.request({ data_collection: missing });
+}

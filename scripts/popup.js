@@ -1,7 +1,7 @@
 const DROPBOX_CLIENT_ID = "bxh6gtfvn361dbe";
 const DROPBOX_REDIRECT_URL = "https://www.ejustice.just.fgov.be/eli/";
 
-import {getStorage, setStorage, getAllHighlights} from "../scripts/util.js";
+import {getStorage, setStorage, getAllHighlights, requestDataCollectionPermissions} from "../scripts/util.js";
 
 function getDownload() {
 	if (typeof window.download !== "function") {
@@ -84,6 +84,15 @@ async function toggleDropboxBackup() {
 		}
 	}
 	else {
+		const dataConsentGranted = await requestDataCollectionPermissions([
+			"browsingActivity",
+			"websiteContent",
+			"websiteActivity",
+		]);
+		if (!dataConsentGranted) {
+			alert("Dropbox backup was not enabled because Firefox data collection consent was not granted.");
+			return;
+		}
 		const Dropbox = getDropbox();
 		let dbxAuth = new Dropbox.DropboxAuth({
 			clientId: DROPBOX_CLIENT_ID,
@@ -109,7 +118,7 @@ async function exportAllHighlights() {
 
 async function populateListOfStoredActs() {
 	async function clearStorage (event) {
-		let act = event.target.parentElement.parentElement.parentElement.children[1].children[0];
+		let act = event.target.closest("tr").querySelector("td:nth-child(2) a");
 		let proceed = confirm("Press OK to remove from the offline database " + act.innerText + ". Highlights will not be affected");
 		if (proceed) {
 			let eli = act.href;
@@ -142,22 +151,70 @@ async function populateListOfStoredActs() {
 	}
 	// Sort array by act date
 	arrayOfActs = arrayOfActs.sort((a, b) => a.date?.localeCompare(b.date));
-	// Build a table of acts
-	let table = "<form autocomplete='off'><input id='search' placeholder='Type text to filter acts' autocomplete='off' autofocus><a id='clearSearch' style='display: none;'>x</a></form>"
-				+"<table><thead><tr><th>Date</th><th>Title</th><th>Clear</th></tr></thead><tbody>";
-	arrayOfActs.forEach(el => {
-		table += `<tr><td>${el.date}</td><td><a href="${el.eli}" target="_blank">${el.fullTitle ? el.fullTitle : el.number}</a></td><td><a class="clear" href="#"><img src="${chrome.runtime.getURL("images/trash.png")}"></a></td></tr>`;
-	});
-	table += "</tbody></table>";
 	// Display table
 	document.querySelector("div#noStoredActs").style.display = "none";
-	document.querySelector("div#storedActs").innerHTML = table;
+	document.querySelector("div#storedActs").replaceChildren(buildStoredActsControls(arrayOfActs));
 	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", runPopupCommand(clearStorage)));
 	document.querySelector("input#search").addEventListener("input", searchChange);
 	document.querySelector("a#clearSearch").addEventListener("click", runPopupCommand(async () => {
 		document.querySelector("input#search").value = "";
 		await searchChange();
 	}));
+}
+
+function buildStoredActsControls(arrayOfActs) {
+	const fragment = document.createDocumentFragment();
+	const form = document.createElement("form");
+	form.autocomplete = "off";
+	const search = document.createElement("input");
+	search.id = "search";
+	search.placeholder = "Type text to filter acts";
+	search.autocomplete = "off";
+	search.autofocus = true;
+	const clearSearch = document.createElement("a");
+	clearSearch.id = "clearSearch";
+	clearSearch.href = "#";
+	clearSearch.style.display = "none";
+	clearSearch.textContent = "x";
+	form.append(search, clearSearch);
+	fragment.appendChild(form);
+
+	const table = document.createElement("table");
+	const thead = document.createElement("thead");
+	const headerRow = document.createElement("tr");
+	for (const label of ["Date", "Title", "Clear"]) {
+		const th = document.createElement("th");
+		th.textContent = label;
+		headerRow.appendChild(th);
+	}
+	thead.appendChild(headerRow);
+	table.appendChild(thead);
+
+	const tbody = document.createElement("tbody");
+	arrayOfActs.forEach(el => {
+		const row = document.createElement("tr");
+		const date = document.createElement("td");
+		date.textContent = el.date || "";
+		const title = document.createElement("td");
+		const link = document.createElement("a");
+		link.href = el.eli;
+		link.target = "_blank";
+		link.textContent = el.fullTitle ? el.fullTitle : el.number;
+		title.appendChild(link);
+		const clear = document.createElement("td");
+		const clearLink = document.createElement("a");
+		clearLink.className = "clear";
+		clearLink.href = "#";
+		const img = document.createElement("img");
+		img.src = chrome.runtime.getURL("images/trash.png");
+		clearLink.appendChild(img);
+		clear.appendChild(clearLink);
+		row.append(date, title, clear);
+		tbody.appendChild(row);
+	});
+	table.appendChild(tbody);
+	fragment.appendChild(table);
+	return fragment;
 }
 
 async function searchChange(e) {

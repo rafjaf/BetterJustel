@@ -495,17 +495,20 @@ window.BJ.caselawModule = function(ctx) {
 			const courtAbbr = COURT_ABBR_MAP[d.court] || d.court || "";
 			const roleNumber = d.roleNumber || "";
 			const juportalUrl = `https://juportal.just.fgov.be/content/ViewDecision.php?id=${encodeURIComponent(d.ecli)}&lang=fr`;
-			const urlLink = `<a href="${juportalUrl}" target="_blank">${formattedDate}</a>`;
-			const citation = `(${courtAbbr}, ${urlLink}, n° ${roleNumber})`;
-
 			for (const abstract of abstracts) {
 				// Key on normalized text + role number: catches duplicates whether they share
 				// the same ECLI or not, and regardless of Unicode apostrophe/quote variants.
 				const key = normalizeAbstract(abstract) + "\x00" + roleNumber;
 				if (seenKeys.has(key)) continue;
 				seenKeys.add(key);
-				const liClass = d.isRelated ? ' class="caselaw-related"' : '';
-				items.push(`<li${liClass}>${abstract} : ${citation}</li>`);
+				items.push({
+					abstract,
+					isRelated: d.isRelated,
+					courtAbbr,
+					formattedDate,
+					roleNumber,
+					juportalUrl
+				});
 				if (d.isRelated) {
 					const relKey = d.relatedFrom + "\x00" + d.relatedArticle;
 					relatedCountMap[relKey] = (relatedCountMap[relKey] || 0) + 1;
@@ -515,13 +518,69 @@ window.BJ.caselawModule = function(ctx) {
 			}
 		}
 
-		const html = items.length ? `<ol>${items.join("")}</ol>` : "";
 		const relatedCounts = Object.entries(relatedCountMap).map(([key, count]) => {
 			const [from, remoteArticle] = key.split("\x00");
 			return { from, remoteArticle, count };
 		});
 
-		return { html, totalCount: items.length, originalCount, relatedCounts };
+		return { items, totalCount: items.length, originalCount, relatedCounts };
+	}
+
+	function createTextSpan(className, text) {
+		const span = document.createElement("span");
+		span.className = className;
+		span.textContent = text;
+		return span;
+	}
+
+	function appendCaselawItems(container, items) {
+		const ol = document.createElement("ol");
+		for (const item of items) {
+			const li = document.createElement("li");
+			if (item.isRelated) {
+				li.className = "caselaw-related";
+			}
+			const link = document.createElement("a");
+			link.href = item.juportalUrl;
+			link.target = "_blank";
+			link.textContent = item.formattedDate;
+			li.append(
+				document.createTextNode(`${item.abstract} : (${item.courtAbbr}, `),
+				link,
+				document.createTextNode(`, n° ${item.roleNumber})`)
+			);
+			ol.appendChild(li);
+		}
+		container.appendChild(ol);
+	}
+
+	function createCaselawBlock(headerParts, items) {
+		const caselawBlock = document.createElement("div");
+		caselawBlock.classList.add("caselaw-block");
+
+		const borderBar = document.createElement("div");
+		borderBar.className = "caselaw-border-bar";
+		borderBar.title = "Click to toggle";
+
+		const header = document.createElement("div");
+		header.className = "caselaw-header";
+		header.role = "button";
+		header.tabIndex = 0;
+		const toggle = document.createElement("span");
+		toggle.className = "caselaw-toggle";
+		toggle.textContent = "▶";
+		header.append(toggle, document.createTextNode(" "));
+		for (const part of headerParts) {
+			header.append(part);
+		}
+
+		const content = document.createElement("div");
+		content.className = "caselaw-content";
+		content.style.display = "none";
+		appendCaselawItems(content, items);
+
+		caselawBlock.append(borderBar, header, content);
+		return caselawBlock;
 	}
 
 	/**
@@ -599,30 +658,24 @@ window.BJ.caselawModule = function(ctx) {
 			const relatedEntries = relatedCaselaw[artNumber] || [];
 			if (!Object.keys(articleData).length && !relatedEntries.length) continue;
 
-			const { html, totalCount, originalCount, relatedCounts } = buildCaselawHTML(articleData, relatedEntries);
-			if (!html) continue;
+			const { items, totalCount, originalCount, relatedCounts } = buildCaselawHTML(articleData, relatedEntries);
+			if (!items.length) continue;
 
 			// Build header text
-			let headerText;
+			let headerParts;
 			if (originalCount === 0) {
-				headerText = `<span class="caselaw-related-ref">Related case law (${totalCount}) on Article ${artNumber}</span>`;
+				headerParts = [createTextSpan("caselaw-related-ref", `Related case law (${totalCount}) on Article ${artNumber}`)];
 			} else {
-				headerText = `Case law (${originalCount}) on Article ${artNumber}`;
+				headerParts = [document.createTextNode(`Case law (${originalCount}) on Article ${artNumber}`)];
 				if (relatedCounts.length > 0) {
 					const parts = relatedCounts.map(r =>
 						`case law (${r.count}) on Article ${r.remoteArticle} of ${r.from}`
 					);
-					headerText += `<span class="caselaw-related-ref"> and ${parts.join(" and ")}</span>`;
+					headerParts.push(createTextSpan("caselaw-related-ref", ` and ${parts.join(" and ")}`));
 				}
 			}
 
-			const caselawBlock = document.createElement("div");
-			caselawBlock.classList.add("caselaw-block");
-			caselawBlock.innerHTML =
-				`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
-				`<div class="caselaw-header" role="button" tabindex="0">` +
-				`<span class="caselaw-toggle">▶</span> ${headerText}</div>` +
-				`<div class="caselaw-content" style="display: none;">${html}</div>`;
+			const caselawBlock = createCaselawBlock(headerParts, items);
 
 			// Insert after the article div
 			const articleDiv = document.querySelector(`div#anchor_${article.id}`);
@@ -640,15 +693,12 @@ window.BJ.caselawModule = function(ctx) {
 		// Handle "general" case law (applies to the act as a whole)
 		if (caselawData["general"]) {
 			const generalData = caselawData["general"];
-			const { html, totalCount } = buildCaselawHTML(generalData);
-			if (html) {
-				const generalBlock = document.createElement("div");
-				generalBlock.classList.add("caselaw-block");
-				generalBlock.innerHTML =
-					`<div class="caselaw-border-bar" title="Click to toggle"></div>` +
-					`<div class="caselaw-header" role="button" tabindex="0">` +
-					`<span class="caselaw-toggle">▶</span> Case law (${totalCount}) on this act as a whole</div>` +
-					`<div class="caselaw-content" style="display: none;">${html}</div>`;
+			const { items, totalCount } = buildCaselawHTML(generalData);
+			if (items.length) {
+				const generalBlock = createCaselawBlock(
+					[document.createTextNode(`Case law (${totalCount}) on this act as a whole`)],
+					items
+				);
 
 				// Insert just under the first title of the document
 				const firstNode = ctx.act.content[0];

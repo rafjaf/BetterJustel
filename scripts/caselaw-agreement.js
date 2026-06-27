@@ -1,4 +1,4 @@
-import { setStorage } from "./util.js";
+import { requestDataCollectionPermissions, setStorage } from "./util.js";
 
 // Load the GPL license text from the extension's LICENSE file
 try {
@@ -33,6 +33,11 @@ cb2.addEventListener("change", updateButton);
 cb3.addEventListener("change", updateButton);
 
 enableBtn.addEventListener("click", async () => {
+	const dataConsentGranted = await requestDataCollectionPermissions(["browsingActivity"]);
+	if (!dataConsentGranted) {
+		alert("Case law display was not enabled because Firefox data collection consent was not granted.");
+		return;
+	}
 	const granted = await chrome.permissions.request({
 		origins: ["https://raw.githubusercontent.com/rafjaf/juportal_crawler/main/data/*"]
 	});

@@ -9,7 +9,7 @@ window.BJ.helpersModule = function() {
 		const container = document.getElementById('status');
 		const item = document.createElement('div');
 		item.classList.add('status-item');
-		item.innerHTML = msg;
+		appendStatusMessage(item, msg);
 		container.appendChild(item);
 
 		// Trigger slide-in after two animation frames so the transition fires
@@ -24,6 +24,35 @@ window.BJ.helpersModule = function() {
 			item.style.opacity = '0';
 			setTimeout(() => item.remove(), 1000);
 		}, 10000);
+	}
+
+	function appendStatusMessage(container, msg) {
+		const doc = new DOMParser().parseFromString(String(msg || ""), "text/html");
+		for (const node of doc.body.childNodes) {
+			appendSanitizedNode(container, node);
+		}
+	}
+
+	function appendSanitizedNode(container, node) {
+		if (node.nodeType == Node.TEXT_NODE) {
+			container.appendChild(document.createTextNode(node.textContent));
+			return;
+		}
+		if (node.nodeType != Node.ELEMENT_NODE) {
+			return;
+		}
+		if (node.tagName == "A") {
+			const a = document.createElement("a");
+			const href = node.getAttribute("href") || "";
+			if (/^(https?:|moz-extension:|chrome-extension:)/i.test(href)) {
+				a.href = href;
+			}
+			a.target = node.getAttribute("target") || "_blank";
+			a.textContent = node.textContent;
+			container.appendChild(a);
+			return;
+		}
+		container.appendChild(document.createTextNode(node.textContent));
 	}
 
 	function findObjectById(obj, id) {

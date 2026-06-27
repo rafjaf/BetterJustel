@@ -13,26 +13,26 @@ window.BJ.highlightsModule = function(ctx) {
 			let i = ctx.highlights.quotes[articleText].findIndex(el => el.id == h.id);
 			return [currentArticle, articleText, i, false];
 		}
-		function escapeHtml(text) {
-			return $("<div>").text(text).html();
-		}
-		function linkifyUrls(text) {
+		function buildLinkedTextFragment(text) {
 			const urlRegex = /(?:(?:https?|ftp):\/\/[^\s<>"']+|file:\/\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;
 			const plainText = String(text || "");
-			let html = "";
+			const fragment = document.createDocumentFragment();
 			let lastIndex = 0;
 			plainText.replace(urlRegex, function(url, offset) {
 				const trimmedUrl = url.replace(/[.,\])]+$/g, "");
 				const trailingText = url.slice(trimmedUrl.length);
-				html += escapeHtml(plainText.slice(lastIndex, offset));
+				fragment.appendChild(document.createTextNode(plainText.slice(lastIndex, offset)));
 				const href = /^www\./i.test(trimmedUrl) ? `http://${trimmedUrl}` : trimmedUrl;
-				html += `<a href="${escapeHtml(href)}">${escapeHtml(trimmedUrl)}</a>`;
-				html += escapeHtml(trailingText);
+				const link = document.createElement("a");
+				link.href = href;
+				link.textContent = trimmedUrl;
+				fragment.appendChild(link);
+				fragment.appendChild(document.createTextNode(trailingText));
 				lastIndex = offset + url.length;
 				return url;
 			});
-			html += escapeHtml(plainText.slice(lastIndex));
-			return html;
+			fragment.appendChild(document.createTextNode(plainText.slice(lastIndex)));
+			return fragment;
 		}
 		function openLink(url) {
 			if (/^file:\/\//i.test(url)) {
@@ -149,7 +149,7 @@ window.BJ.highlightsModule = function(ctx) {
 			annotation.addEventListener("pointercancel", stopResize);
 		}
 		function renderAnnotation(annotation, text) {
-			annotation.innerHTML = linkifyUrls(text);
+			annotation.replaceChildren(buildLinkedTextFragment(text));
 			addAnnotationResize(annotation);
 		}
 		let s = document.getSelection();
@@ -266,10 +266,12 @@ window.BJ.highlightsModule = function(ctx) {
 					} else {
 						annotationText = ctx.highlights.quotes[articleText][i]?.annotation || "";
 					}
-					annotationText = linkifyUrls(annotationText);
-					$("div#content").append(`<annotation id="${event.target.id}" class="${event.target.classList[0]}" `
-										   +`contenteditable="true">${annotationText}</annotation>`);
-					addAnnotationResize(document.querySelector(`annotation#${event.target.id}`));
+					const annotation = document.createElement("annotation");
+					annotation.id = event.target.id;
+					annotation.className = event.target.classList[0];
+					annotation.contentEditable = "true";
+					renderAnnotation(annotation, annotationText);
+					document.querySelector("div#content").appendChild(annotation);
 				}
 				$(`annotation#${event.target.id}`).css({left: `${Math.min(relX - 5, $("div#content").width() - 200)}px`, top: `${relY - 130}px`}).show();
 			}
@@ -355,14 +357,22 @@ window.BJ.highlightsModule = function(ctx) {
 			return
 		}
 		document.querySelector("div#bookmark-bar").style.display = "block";
-		let html = ""
+		const items = document.querySelector("div#bookmark-bar div#items");
+		items.replaceChildren();
 		for (const b of bookmarks) {
 			const node = b.id.split("_")[1];
 			// const title = document.querySelector("li#" + node).textContent;
 			const title = ctx.findObjectById(ctx.act, node).text;
-			html += `<div><span class="bookmark"></span><span class="item" target="${b.id}">${title}</span></div>`;
+			const item = document.createElement("div");
+			const bookmark = document.createElement("span");
+			bookmark.className = "bookmark";
+			const label = document.createElement("span");
+			label.className = "item";
+			label.setAttribute("target", b.id);
+			label.textContent = title;
+			item.append(bookmark, label);
+			items.appendChild(item);
 		}
-		document.querySelector("div#bookmark-bar div#items").innerHTML = html;
 	}
 
 	return { manageHighlights, updateBookmarkBar };

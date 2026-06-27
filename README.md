@@ -99,3 +99,4 @@ It makes use of the following open source libraries :
 	- fixed popup commands not working (Export higlights and Enable Dropbox sync)
 	- prettified export highlights
 	- highlight annotation popups can now be resized and file:/// URLs are automatically transformed into links
+	- implemented Firefox Developer Hub recommendations

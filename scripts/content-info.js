@@ -1,6 +1,18 @@
 window.BJ = window.BJ || {};
 window.BJ.infoModule = function(ctx) {
 
+	function replaceChildrenFromHTML(element, html) {
+		const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+		element.replaceChildren(...Array.from(doc.body.childNodes).map(node => document.importNode(node, true)));
+	}
+
+	function wrapChildrenInTitle(element) {
+		const title = document.createElement("span");
+		title.className = "title";
+		title.append(...Array.from(element.childNodes));
+		element.replaceChildren(title);
+	}
+
 	async function analyseFirstInfo() {
 		console.log(`[Better Justel] analyseFirstInfo() started (readyState: "${document.readyState}")`);
 		// Capture numac of the act from the top of the page
@@ -143,14 +155,13 @@ window.BJ.infoModule = function(ctx) {
 		// Remove numac tag
 		document.querySelector("div#list-title-1 span.tag").remove();
 		// Separate title of the act from additional notes and the last update date
-		document.querySelector("div#list-title-1 p.list-item--title").innerHTML
-			= document.querySelector("div#list-title-1 p.list-item--title").innerHTML
+		const titleElement = document.querySelector("div#list-title-1 p.list-item--title");
+		replaceChildrenFromHTML(titleElement, titleElement.innerHTML
 			  .replace(/(\s+)?(.+?)(\(NOTE.+)/, "<span class='title'>$2</span>$3")
 			  .replace(/(mise à jour au \d{2}-\d{2}-\d{4})/, "<span class='update'>$1</span>")
-			  .replace(/(annulé)/, "<span class='update'>$1</span>");
-		if (!document.querySelector("div#list-title-1 p.list-item--title").innerHTML.match(/NOTE/)) {
-			document.querySelector("div#list-title-1 p.list-item--title").innerHTML
-			= "<span class='title'>" + document.querySelector("div#list-title-1 p.list-item--title").innerHTML + "</span>";
+			  .replace(/(annulé)/, "<span class='update'>$1</span>"));
+		if (!titleElement.textContent.match(/NOTE/)) {
+			wrapChildrenInTitle(titleElement);
 		}
 		// Make sure links open in a new page
 		Array.from(document.querySelectorAll("div#list-title-1 div.plain-text a")).forEach(a => a.target = "_blank");
