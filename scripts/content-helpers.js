@@ -1,11 +1,12 @@
 window.BJ = window.BJ || {};
 window.BJ.helpersModule = function() {
+	const statusTimers = new WeakMap();
 
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-	function showStatusMessage(msg) {
+	function showStatusMessage(msg, duration = 10000) {
 		const container = document.getElementById('status');
 		const item = document.createElement('div');
 		item.classList.add('status-item');
@@ -18,12 +19,27 @@ window.BJ.helpersModule = function() {
 			item.style.opacity = '1';
 		}));
 
-		// After 10 seconds, fade out and remove
-		setTimeout(() => {
+		if (duration > 0) { scheduleStatusRemoval(item, duration); }
+		return item;
+	}
+
+	function updateStatusMessage(item, msg, duration = 10000) {
+		if (!item?.isConnected) { return showStatusMessage(msg, duration); }
+		const oldTimer = statusTimers.get(item);
+		if (oldTimer) { clearTimeout(oldTimer); }
+		item.replaceChildren();
+		appendStatusMessage(item, msg);
+		if (duration > 0) { scheduleStatusRemoval(item, duration); }
+		return item;
+	}
+
+	function scheduleStatusRemoval(item, duration) {
+		const timer = setTimeout(() => {
 			item.style.transform = 'translateY(100%)';
 			item.style.opacity = '0';
 			setTimeout(() => item.remove(), 1000);
-		}, 10000);
+		}, duration);
+		statusTimers.set(item, timer);
 	}
 
 	function appendStatusMessage(container, msg) {
@@ -90,5 +106,5 @@ window.BJ.helpersModule = function() {
 		}
 	}
 
-	return { delay, showStatusMessage, findObjectById, addLoading };
+	return { delay, showStatusMessage, updateStatusMessage, findObjectById, addLoading };
 };

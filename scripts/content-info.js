@@ -168,7 +168,7 @@ window.BJ.infoModule = function(ctx) {
 		ctx.act.info = document.querySelector("div#list-title-1 div.list-item--content").innerHTML
 			.replace(/<p>/g, "<span>").replace(/<\/p>/g, "</span>");
 		let additionalInfo = [];
-		additionalInfo.push(`<a href='${ctx.act.eli}' target="_blank">ELI</a>`);
+		additionalInfo.push(`<a id='copyELI' href='#'>Copy ELI</a>`);
 		if (originalPDF) { additionalInfo.push(`<a href='${originalPDF}' target="_blank">Moniteur belge</a>`); }
 		if (consolidatedPDF) { 
 			additionalInfo.push(`<a href='${consolidatedPDF}' target="_blank">PDF consolidé</a>`);

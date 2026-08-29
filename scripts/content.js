@@ -24,8 +24,8 @@
 	Object.assign(ctx, {getStorage, setStorage, getAllHighlights});
 
 	// Initialize modules
-	const {delay, showStatusMessage, findObjectById, addLoading} = BJ.helpersModule();
-	Object.assign(ctx, {delay, showStatusMessage, findObjectById, addLoading});
+	const {delay, showStatusMessage, updateStatusMessage, findObjectById, addLoading} = BJ.helpersModule();
+	Object.assign(ctx, {delay, showStatusMessage, updateStatusMessage, findObjectById, addLoading});
 
 	const {analyseContent, buildContent} = BJ.analyseModule(ctx);
 	Object.assign(ctx, {buildContent});
@@ -62,6 +62,94 @@
 		document.body.replaceChildren(document.createTextNode(message));
 	}
 
+	function getLastUpdateFromPartialHtml(html, fallbackDate) {
+		const containerStart = html.search(/<div\b[^>]*id=["']list-title-1["'][^>]*>/i);
+		if (containerStart < 0) { return undefined; }
+		const relativeTitleStart = html.slice(containerStart)
+			.search(/<p\b[^>]*class=["'][^"']*\blist-item--title\b[^"']*["'][^>]*>/i);
+		if (relativeTitleStart < 0) { return undefined; }
+		const titleStart = containerStart + relativeTitleStart;
+		const titleEnd = html.indexOf("</p>", titleStart);
+		if (titleEnd < 0) { return undefined; }
+		const title = html.slice(titleStart, titleEnd);
+		// Justel currently sends this response using a legacy character encoding, so the
+		// accented "à" may arrive as an HTML entity or a replacement character.
+		const update = title.match(/mise\s+\S+\s+jour au\s+(\d{2})-(\d{2})-(\d{4})/i);
+		return update ? `${update[3]}-${update[2]}-${update[1]}` : fallbackDate;
+	}
+
+	async function getLastUpdateFromResponse(response, fallbackDate) {
+		if (!response.body?.getReader) {
+			const result = getLastUpdateFromPartialHtml(await response.text(), fallbackDate);
+			if (result === undefined) { throw new Error("The Justel response did not contain the act information"); }
+			return result;
+		}
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let html = "";
+		while (true) {
+			const {done, value} = await reader.read();
+			if (done) { break; }
+			html += decoder.decode(value, {stream: true});
+			const result = getLastUpdateFromPartialHtml(html, fallbackDate);
+			if (result !== undefined) {
+				await reader.cancel();
+				return result;
+			}
+			if (html.length > 5 * 1024 * 1024) {
+				await reader.cancel();
+				throw new Error("The Justel act information was not found near the start of the response");
+			}
+		}
+		html += decoder.decode();
+		const result = getLastUpdateFromPartialHtml(html, fallbackDate);
+		if (result === undefined) { throw new Error("The Justel response did not contain the act information"); }
+		return result;
+	}
+
+	async function checkForUpdatedAct(eli) {
+		if (!navigator.onLine) { return; }
+		const today = new Date().toISOString().slice(0, 10);
+		let updateInfo = await getStorage("updateInfo") || {};
+		let cached = updateInfo[eli];
+		if (!cached || cached.lastChecked === today || cached.lastCheckAttempt === today) { return; }
+
+		// Record the attempt first so reopening the same large act does not repeatedly
+		// contact Justel if the server is unavailable.
+		cached.lastCheckAttempt = today;
+		await setStorage("updateInfo", updateInfo);
+		ctx.updateInfo = updateInfo;
+		const status = showStatusMessage("Checking Justel for a newer version of this act…", 0);
+
+		try {
+			const response = await fetch(eli, {cache: "no-store", credentials: "include"});
+			if (!response.ok) { throw new Error(`Justel returned HTTP ${response.status}`); }
+			const onlineLastUpdate = await getLastUpdateFromResponse(response, cached.date);
+			if (!onlineLastUpdate) { throw new Error("The latest update date could not be determined"); }
+
+			if (onlineLastUpdate === cached.act) {
+				updateInfo = await getStorage("updateInfo") || {};
+				if (updateInfo[eli]) {
+					updateInfo[eli].lastChecked = today;
+					updateInfo[eli].lastCheckAttempt = today;
+					await setStorage("updateInfo", updateInfo);
+					ctx.updateInfo = updateInfo;
+				}
+				updateStatusMessage(status, "The stored act is up to date", 10000);
+				return;
+			}
+
+			updateStatusMessage(status, "A newer version was found. Loading it from Justel…", 0);
+			const result = await chrome.runtime.sendMessage({action: "refreshOnline", url: eli});
+			if (!result?.ok) { throw new Error(result?.error || "Could not start the online refresh"); }
+		}
+		catch (e) {
+			console.warn("[Better Justel] Background update check failed:", e.message);
+			updateStatusMessage(status, "Could not check Justel for updates. The stored act remains available.", 10000);
+		}
+	}
+
 	const {researchPage, processResultsPage} = BJ.searchModule();
 
 	async function analyseAct() {
@@ -78,6 +166,7 @@
 				fullTitle: ctx.act.fullTitle,
 				script: chrome.runtime.getManifest().version,
 				lastChecked: new Date().toISOString().slice(0, 10),
+				lastCheckAttempt: new Date().toISOString().slice(0, 10),
 			};
 			await setStorage("updateInfo", ctx.updateInfo);
 		}
@@ -150,6 +239,7 @@
 				ctx.act = cachedAct;
 				// Record that we checked today
 				ctx.updateInfo[cachedEli].lastChecked = today;
+				ctx.updateInfo[cachedEli].lastCheckAttempt = today;
 				await setStorage("updateInfo", ctx.updateInfo);
 				await displayContent(false);
 				return;
@@ -244,19 +334,21 @@
 			showPageError("Error, you shouldn't access this page directly");
 		}
 		else {
-			if (navigator.onLine) {
-				// Let's redirect to online page since we are online
-				window.location.href = eli;
-				return;
-			}
-			// Offline mode
 			addLoading("Restoring page from offline database");
+			ctx.updateInfo = await getStorage("updateInfo") || {};
 			ctx.act = await getStorage(eli);
-			if (ctx.act) {
+			if (ctx.act?.content?.length) {
 				await displayContent(false);
+				checkForUpdatedAct(eli).catch(e => console.error(e));
 			}
 			else {
-				showPageError(`Error, ${eli} has not been stored in the offline database`);
+				if (navigator.onLine) {
+					const result = await chrome.runtime.sendMessage({action: "refreshOnline", url: eli});
+					if (!result?.ok) { showPageError(result?.error || `Error loading ${eli}`); }
+				}
+				else {
+					showPageError(`Error, ${eli} has not been stored in the offline database`);
+				}
 			}
 		}
 	}

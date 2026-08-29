@@ -1,5 +1,46 @@
 window.BJ = window.BJ || {};
 window.BJ.displayModule = function(ctx) {
+	async function copyText(text) {
+		if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(text);
+			return;
+		}
+		const input = document.createElement("textarea");
+		input.value = text;
+		input.style.position = "fixed";
+		input.style.left = "-9999px";
+		document.body.appendChild(input);
+		input.select();
+		const copied = document.execCommand("copy");
+		input.remove();
+		if (!copied) { throw new Error("Clipboard access was refused"); }
+	}
+
+	function setupCopyEli() {
+		let link = document.querySelector("div#info a#copyELI");
+		if (!link) {
+			// Upgrade the ELI link embedded in acts cached by an older extension version.
+			link = Array.from(document.querySelectorAll("div#info a"))
+				.find(a => a.textContent.trim() === "ELI" && a.href === ctx.act.eli);
+		}
+		if (!link) { return; }
+		link.id = "copyELI";
+		link.href = "#";
+		link.removeAttribute("target");
+		link.textContent = "Copy ELI";
+		link.title = ctx.act.eli;
+		link.addEventListener("click", async function(event) {
+			event.preventDefault();
+			try {
+				await copyText(ctx.act.eli);
+				ctx.showStatusMessage("ELI copied to clipboard");
+			}
+			catch (e) {
+				console.error("[Better Justel] Could not copy ELI:", e.message);
+				ctx.showStatusMessage("Could not copy the ELI to the clipboard");
+			}
+		});
+	}
 
 	async function displayContent(online) {
 		async function loadHighlights() {
@@ -60,6 +101,20 @@ window.BJ.displayModule = function(ctx) {
 			if (changesMade) { await ctx.setStorage("highlights-" + ctx.act.eli, ctx.highlights.quotes); }
 		}
 		// Erase document and start afresh
+		// The online document's styles otherwise keep affecting the rebuilt DOM,
+		// while the standalone offline document has only Better Justel's styles.
+		// Parsing is complete at this point, so the original Justel CSS is no
+		// longer needed and can safely be detached.
+		document.querySelectorAll('link[rel~="stylesheet"]').forEach(function(link) {
+			try {
+				if (new URL(link.href).hostname === "www.ejustice.just.fgov.be") {
+					link.remove();
+				}
+			}
+			catch (_) {}
+		});
+		document.body.removeAttribute("style");
+		document.body.className = "better-justel";
 		$("body").children().remove();
 		$("body").append(`<div id='main'>
 								<div id='info'></div>
@@ -84,6 +139,7 @@ window.BJ.displayModule = function(ctx) {
 		// Build document info
 		$("div#info").append(ctx.act.info);
 		$("div#info").append("<br>");
+		setupCopyEli();
 		$("div#info a#btnSavePDF").on("click", function (event, date) {
 			let a = document.createElement("a");
 			a.style = "display: none";

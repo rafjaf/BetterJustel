@@ -273,6 +273,19 @@ function updateCaselawLink(enabled) {
 }
 
 // Main
+const fastOfflineBrowsing = document.querySelector("input#fastOfflineBrowsing");
+fastOfflineBrowsing.checked = (await getStorage("fastOfflineBrowsing")) === true;
+fastOfflineBrowsing.addEventListener("change", async function() {
+	try {
+		await setStorage("fastOfflineBrowsing", fastOfflineBrowsing.checked);
+	}
+	catch (e) {
+		fastOfflineBrowsing.checked = !fastOfflineBrowsing.checked;
+		console.error(e);
+		alert(e.message || "The setting could not be saved");
+	}
+});
+
 let highlightsBackup = await getStorage("highlightsBackup") || {};
 if (highlightsBackup.accessToken) {
 	document.querySelector("a#toggleDropboxBackup").innerText = "Disable Dropbox backup of highlights";

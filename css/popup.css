@@ -5,6 +5,20 @@ body {
 h1 {
 	text-align: center;
 }
+.setting {
+	display: flex;
+	gap: 0.5rem;
+	align-items: flex-start;
+	cursor: pointer;
+}
+.setting input {
+	margin-top: 0.2rem;
+}
+.settings-group {
+	font-weight: bold;
+	margin-top: 1rem;
+	margin-bottom: 0.25rem;
+}
 form {
 	position: relative;
 }
