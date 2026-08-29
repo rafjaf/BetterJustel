@@ -6,6 +6,7 @@ window.BJ.analyseModule = function(ctx) {
 	function analyseContent() {
 		// Declarations
 		let currentParents = [], lastNode, counter = 1;
+		const ARTICLE_ANCHOR_TEXT = /^Art(?:\.|icle)\s*(?:[A-Z]+\.)?\d+\w*(?:(?:\.|\/|:|-)\d+\w*)*\.$/i;
 		// Internal function
 		function analyseHeading(n) {
 			let heading = {};
@@ -107,7 +108,7 @@ window.BJ.analyseModule = function(ctx) {
 			// Sanitize text of the node
 			n.text = n.text.replace(/[\[\]]|[\(\)]|--+/g, "").replace(/\s\s/g, " ")
 				.replace(/(\d+(er)?\.)([A-Z])/g, "$1 $3");
-			const ARTICLE_REGEX = /Art(\.|icle)\s?[LR]?([IVX]+|\d+(\w+)?)((\.|\/|:|-)\d+)?((\.|\/|:|-)\d+)?\.(.+[a-zéèA-Z]$)?/
+			const ARTICLE_REGEX = /Art(?:\.|icle)\s?[LR]?(?:[IVX]+|\d+\w*)(?:(?:\.|\/|:|-)\d+\w*)*\.(?:.+[a-zéèA-Z]$)?/
 			let m = n.text.match(ARTICLE_REGEX);
 			if (m) { n.text = m[0]; }
 			// Rules depending on node type
@@ -285,12 +286,16 @@ window.BJ.analyseModule = function(ctx) {
 		}
 		// Anlyse each node depending on their type
 		for (let [index, n] of contentNodes.entries()) {
-			if ( (n.nodeName == "A") && (n.name) && (n.name.startsWith("LNK") && !(n.textContent.toLowerCase().startsWith("annexe")) ) ) {
+			const isArticleAnchor = (n.nodeName == "A") && (n.name)
+				&& (n.name.startsWith("Art")
+					|| n.textContent.toLowerCase().startsWith("annexe")
+					|| ARTICLE_ANCHOR_TEXT.test(n.textContent.trim()));
+			if ( (n.nodeName == "A") && (n.name) && n.name.startsWith("LNK") && !isArticleAnchor ) {
 				// This is a heading
 				if (lastNode) { beautify(lastNode); }
 				analyseHeading(n);
 			}
-			else if ( (n.nodeName == "A") && (n.name) && (n.name.startsWith("Art") || n.textContent.toLowerCase().startsWith("annexe") ) ) {
+			else if (isArticleAnchor) {
 				// This is an article, to be attached to last heading
 				if (lastNode) { beautify(lastNode); }
 				lastNode = buildLastNode(n);

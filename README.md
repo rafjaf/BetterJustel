@@ -102,3 +102,5 @@ It makes use of the following open source libraries :
 	- implemented Firefox Developer Hub recommendations
 - Version 0.5 :
 	- optional faster loading of already stored acts (needs to be enable in the settings in the popup window). As a drawback, the browser will be redirected to the Chrome extension page, not the original Justel page (whose URL can be retrieved by clicking on "Copy ELI"). You will need to confirm the grant of webNavigation permission, i.e. access to the browser navigation history (required to interrupt the loading of the page on Justel web server, which is often much slower)
+	- improved layout for the information pane at the top of the page
+	- fixed Art.XV.125/5 ff. CDE being mischaracterized as headings

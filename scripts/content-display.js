@@ -16,6 +16,37 @@ window.BJ.displayModule = function(ctx) {
 		if (!copied) { throw new Error("Clipboard access was refused"); }
 	}
 
+	function normalizeInfoLinks() {
+		const info = document.querySelector("div#info");
+		if (!info) { return; }
+
+		let justelBase;
+		try {
+			justelBase = new URL("/cgi_loi/", ctx.act.eli);
+		}
+		catch (e) {
+			justelBase = new URL("https://www.ejustice.just.fgov.be/cgi_loi/");
+		}
+
+		for (const link of info.querySelectorAll("a[href]")) {
+			const href = link.getAttribute("href")?.trim();
+			if (!href || href.startsWith("#") || /^[a-z][a-z\d+.-]*:/i.test(href)) {
+				continue;
+			}
+			try {
+				// Justel's stored markup contains both root-relative (/cgi_loi/...)
+				// and directory-relative (article.pl?...) links. Resolve both against
+				// Justel instead of the chrome-extension:// offline page.
+				link.href = href.startsWith("/")
+					? new URL(href, justelBase.origin).href
+					: new URL(href, justelBase).href;
+			}
+			catch (e) {
+				console.warn("[Better Justel] Could not resolve stored link:", href);
+			}
+		}
+	}
+
 	function setupCopyEli() {
 		let link = document.querySelector("div#info a#copyELI");
 		if (!link) {
@@ -40,6 +71,118 @@ window.BJ.displayModule = function(ctx) {
 				ctx.showStatusMessage("Could not copy the ELI to the clipboard");
 			}
 		});
+	}
+
+	function enhanceInfoPanel() {
+		const info = document.querySelector("div#info");
+		if (!info) { return; }
+		info.classList.add("act-header");
+		info.setAttribute("aria-label", "Act information and actions");
+
+		const brand = document.createElement("div");
+		brand.className = "act-header__brand";
+		brand.textContent = "Better Justel";
+		brand.title = "Enhanced by Better Justel";
+		info.prepend(brand);
+
+		const heading = info.querySelector("p.list-item--title");
+		const title = heading?.querySelector(":scope > span.title");
+		if (heading) {
+			heading.classList.add("act-header__heading");
+		}
+		if (heading && title) {
+			title.classList.add("act-header__title");
+			const notes = document.createElement("span");
+			notes.className = "act-header__notes";
+			while (title.nextSibling) {
+				notes.appendChild(title.nextSibling);
+			}
+			if (notes.textContent.trim() || notes.children.length) {
+				heading.appendChild(notes);
+			}
+		}
+
+		const metadata = info.querySelector("div.plain-text");
+		let actions = info.querySelector("div#addinfodiv");
+		if (!actions) {
+			actions = document.createElement("div");
+			actions.id = "addinfodiv";
+			info.appendChild(actions);
+		}
+		actions.classList.add("act-header__actions");
+		actions.setAttribute("role", "group");
+		actions.setAttribute("aria-label", "Document actions and related resources");
+
+		if (metadata) {
+			metadata.classList.add("act-header__metadata");
+			metadata.setAttribute("aria-label", "Document metadata");
+			let lastMetadataItem = null;
+			const relatedActions = [];
+
+			for (const item of Array.from(metadata.children)) {
+				const text = item.textContent.trim();
+				if (item.classList.contains("tag-small")) {
+					const value = lastMetadataItem?.querySelector(".act-header__meta-value");
+					if (value) {
+						value.appendChild(item);
+					}
+					continue;
+				}
+
+				if (/(versions? archiv|arr.t.s? d['’]ex.cution)/i.test(text) && item.querySelector("a")) {
+					relatedActions.push(item);
+					continue;
+				}
+
+				item.classList.add("act-header__meta-item");
+				const label = item.querySelector(":scope > strong");
+				if (label) {
+					const labelText = label.textContent.trim().replace(/\s*:\s*$/, "");
+					const value = document.createElement("span");
+					value.className = "act-header__meta-value";
+					while (label.nextSibling) {
+						value.appendChild(label.nextSibling);
+					}
+					label.className = "act-header__meta-label";
+					label.textContent = labelText;
+					item.appendChild(value);
+
+					if (/^(source|entr.e en vigueur|ce texte modifie)/i.test(labelText)) {
+						item.classList.add("act-header__meta-item--wide");
+					}
+				}
+				lastMetadataItem = item;
+			}
+
+			for (const node of Array.from(metadata.childNodes)) {
+				if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
+					node.remove();
+				}
+			}
+
+			const clearAction = actions.querySelector("a#clearDB")?.parentElement;
+			for (const relatedAction of relatedActions) {
+				actions.insertBefore(relatedAction, clearAction || null);
+			}
+		}
+
+		for (const action of Array.from(actions.children)) {
+			action.classList.add("act-header__action");
+			const link = action.querySelector("a");
+			if (!link) { continue; }
+			link.classList.add("act-header__button");
+			if (link.id === "copyELI") {
+				link.classList.add("act-header__button--primary");
+			}
+			if (link.id === "clearDB") {
+				link.classList.add("act-header__button--danger");
+			}
+			if (link.id === "btnSavePDF") {
+				link.classList.add("act-header__button--icon");
+				link.title = "Download consolidated PDF";
+				link.setAttribute("aria-label", "Download consolidated PDF");
+			}
+		}
 	}
 
 	async function displayContent(online) {
@@ -138,8 +281,9 @@ window.BJ.displayModule = function(ctx) {
 		 });
 		// Build document info
 		$("div#info").append(ctx.act.info);
-		$("div#info").append("<br>");
+		normalizeInfoLinks();
 		setupCopyEli();
+		enhanceInfoPanel();
 		$("div#info a#btnSavePDF").on("click", function (event, date) {
 			let a = document.createElement("a");
 			a.style = "display: none";
