@@ -101,4 +101,4 @@ It makes use of the following open source libraries :
 	- highlight annotation popups can now be resized and file:/// URLs are automatically transformed into links
 	- implemented Firefox Developer Hub recommendations
 - Version 0.5 :
-	- faster loading of already stored acts (optional, needs to be enable in the settings in the popup window). As a drawback, the browser will be redirected to the Chrome extension page, not the original Justel page (whose URL can be retrieved by clicking on "Copy ELI")
+	- optional faster loading of already stored acts (needs to be enable in the settings in the popup window). As a drawback, the browser will be redirected to the Chrome extension page, not the original Justel page (whose URL can be retrieved by clicking on "Copy ELI"). You will need to confirm the grant of webNavigation permission, i.e. access to the browser navigation history (required to interrupt the loading of the page on Justel web server, which is often much slower)

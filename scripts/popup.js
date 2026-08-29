@@ -274,13 +274,27 @@ function updateCaselawLink(enabled) {
 
 // Main
 const fastOfflineBrowsing = document.querySelector("input#fastOfflineBrowsing");
-fastOfflineBrowsing.checked = (await getStorage("fastOfflineBrowsing")) === true;
+const fastOfflineBrowsingStored = (await getStorage("fastOfflineBrowsing")) === true;
+const hasWebNavigationPermission = await chrome.permissions.contains({permissions: ["webNavigation"]});
+fastOfflineBrowsing.checked = fastOfflineBrowsingStored && hasWebNavigationPermission;
+if (fastOfflineBrowsingStored && !hasWebNavigationPermission) {
+	await setStorage("fastOfflineBrowsing", false);
+}
 fastOfflineBrowsing.addEventListener("change", async function() {
+	const enabling = fastOfflineBrowsing.checked;
 	try {
-		await setStorage("fastOfflineBrowsing", fastOfflineBrowsing.checked);
+		if (enabling) {
+			const granted = await chrome.permissions.request({permissions: ["webNavigation"]});
+			if (!granted) {
+				fastOfflineBrowsing.checked = false;
+				await setStorage("fastOfflineBrowsing", false);
+				return;
+			}
+		}
+		await setStorage("fastOfflineBrowsing", enabling);
 	}
 	catch (e) {
-		fastOfflineBrowsing.checked = !fastOfflineBrowsing.checked;
+		fastOfflineBrowsing.checked = !enabling;
 		console.error(e);
 		alert(e.message || "The setting could not be saved");
 	}

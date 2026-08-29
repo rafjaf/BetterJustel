@@ -60,11 +60,44 @@ async function redirectCachedNavigation(details) {
 	}
 }
 
-chrome.webNavigation.onBeforeNavigate.addListener(redirectCachedNavigation);
-
-chrome.webNavigation.onCompleted.addListener(async function(details) {
+async function clearOnlineBypassAfterNavigation(details) {
 	if (details.frameId !== 0 || !cacheKeyForUrl(details.url)) { return; }
 	await chrome.storage.local.remove(ONLINE_BYPASS_PREFIX + details.tabId);
+}
+
+let webNavigationListenersRegistered = false;
+
+function registerWebNavigationListeners() {
+	if (webNavigationListenersRegistered || !chrome.webNavigation) { return; }
+	chrome.webNavigation.onBeforeNavigate.addListener(redirectCachedNavigation);
+	chrome.webNavigation.onCompleted.addListener(clearOnlineBypassAfterNavigation);
+	webNavigationListenersRegistered = true;
+}
+
+function unregisterWebNavigationListeners() {
+	if (!webNavigationListenersRegistered) { return; }
+	if (chrome.webNavigation) {
+		chrome.webNavigation.onBeforeNavigate.removeListener(redirectCachedNavigation);
+		chrome.webNavigation.onCompleted.removeListener(clearOnlineBypassAfterNavigation);
+	}
+	webNavigationListenersRegistered = false;
+}
+
+// Register synchronously when the API is available so Manifest V3 can wake the
+// service worker for navigation events after the optional permission is granted.
+registerWebNavigationListeners();
+
+chrome.permissions.onAdded.addListener(function(permissions) {
+	if (permissions.permissions?.includes("webNavigation")) {
+		registerWebNavigationListeners();
+	}
+});
+
+chrome.permissions.onRemoved.addListener(function(permissions) {
+	if (permissions.permissions?.includes("webNavigation")) {
+		unregisterWebNavigationListeners();
+		chrome.storage.local.set({fastOfflineBrowsing: false});
+	}
 });
 
 chrome.tabs.onRemoved.addListener(async function(tabId) {
