@@ -10,7 +10,26 @@
 	<h1>Better Justel</h1>
 	<h2>Acts stored in the offline database</h2>
 		<div id="storedActs"></div>
-		<div id="noStoredActs">No matching act currently stored in the offline database. Please consult any text on <a href="https://www.ejustice.just.fgov.be/cgi_loi/rech.pl?language=fr" target="_blank">Justel</a>.</div>
+		<div id="noStoredActs" class="empty-state">
+			<p id="noStoredActsMessage" class="empty-state__message" aria-live="polite">No acts are stored offline yet.</p>
+			<section class="justel-search" aria-labelledby="justelSearchTitle">
+				<div class="justel-search__header">
+					<h3 id="justelSearchTitle">Search Justel online</h3>
+					<a href="https://www.ejustice.just.fgov.be/cgi_loi/rech.pl?language=fr" target="_blank">Advanced search <span aria-hidden="true">↗</span></a>
+				</div>
+				<p id="justelSearchDescription" class="justel-search__description">Enter terms above to search act titles on Justel.</p>
+				<div id="justelDetectedDate" class="justel-search__date" hidden>Promulgation: <strong></strong></div>
+				<div class="justel-search__actions">
+					<button id="searchJustel" type="button" disabled>Search Justel</button>
+					<div class="justel-search__filters" aria-label="Restrict search by legal nature">
+						<span>Restrict to</span>
+						<a data-justel-nature="LOI" target="_blank" aria-disabled="true">Loi</a>
+						<a data-justel-nature="ARRETE ROYAL" target="_blank" aria-disabled="true">AR</a>
+						<a data-justel-nature="TRAITE" target="_blank" aria-disabled="true">Traité</a>
+					</div>
+				</div>
+			</section>
+		</div>
 	<h2>Settings</h2>
 		<label class="setting"><input id="fastOfflineBrowsing" type="checkbox"> Load stored acts immediately and check Justel for updates in the background (affects the URL of the page)</label>
 		<div class="settings-group">Highlights</div>

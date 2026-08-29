@@ -2,6 +2,7 @@ const DROPBOX_CLIENT_ID = "bxh6gtfvn361dbe";
 const DROPBOX_REDIRECT_URL = "https://www.ejustice.just.fgov.be/eli/";
 
 import {getStorage, setStorage, getAllHighlights, requestDataCollectionPermissions} from "../scripts/util.js";
+import {parseJustelQuery, buildJustelSearchUrl} from "../scripts/popup-search.js";
 
 function getDownload() {
 	if (typeof window.download !== "function") {
@@ -28,6 +29,56 @@ function runPopupCommand(handler) {
 			alert(e.message || "The command failed");
 		}
 	};
+}
+
+function updateJustelSearchState(value, hasStoredActs) {
+	const raw = value.trim();
+	const query = parseJustelQuery(raw);
+	const message = document.querySelector("#noStoredActsMessage");
+	message.textContent = raw
+		? `No stored act matches “${raw}”. You can continue the search on Justel.`
+		: (hasStoredActs
+			? "No stored act matches this filter."
+			: "No acts are stored offline yet. Search Justel to find one.");
+
+	const description = document.querySelector("#justelSearchDescription");
+	if (!raw) {
+		description.textContent = "Enter terms above to search act titles on Justel.";
+	}
+	else if (query.date && query.title) {
+		description.textContent = `Search “${query.title}” in act titles with the detected promulgation date.`;
+	}
+	else if (query.date) {
+		description.textContent = "Search acts with the detected promulgation date.";
+	}
+	else {
+		description.textContent = "Search these terms in act titles.";
+	}
+
+	const date = document.querySelector("#justelDetectedDate");
+	date.hidden = !query.date;
+	date.querySelector("strong").textContent = query.date;
+
+	const button = document.querySelector("#searchJustel");
+	button.disabled = !raw;
+	for (const link of document.querySelectorAll("a[data-justel-nature]")) {
+		if (raw) {
+			link.href = buildJustelSearchUrl(raw, link.dataset.justelNature);
+			link.removeAttribute("aria-disabled");
+			link.tabIndex = 0;
+		}
+		else {
+			link.removeAttribute("href");
+			link.setAttribute("aria-disabled", "true");
+			link.tabIndex = -1;
+		}
+	}
+}
+
+function launchJustelSearch() {
+	const value = document.querySelector("input#search").value;
+	if (!value.trim()) { return; }
+	chrome.tabs.create({url: buildJustelSearchUrl(value)});
 }
 
 async function importHighlights() {
@@ -136,12 +187,11 @@ async function populateListOfStoredActs() {
 			// await setStorage("highlights-" + eli, "");
 			// Remove from popup list of acts
 			event.target.parentElement.parentElement.parentElement.remove();
+			await searchChange();
 		}
 	}
 	// Get list of stored acts
-	let listOfActs = await getStorage("updateInfo");
-	// Exit if no stored acts
-	if (!listOfActs) {return;}
+	let listOfActs = await getStorage("updateInfo") || {};
 	// Turn it into an array
 	let arrayOfActs = [];
 	for (const key in listOfActs) {
@@ -152,23 +202,27 @@ async function populateListOfStoredActs() {
 	// Sort array by act date
 	arrayOfActs = arrayOfActs.sort((a, b) => a.date?.localeCompare(b.date));
 	// Display table
-	document.querySelector("div#noStoredActs").style.display = "none";
 	document.querySelector("div#storedActs").replaceChildren(buildStoredActsControls(arrayOfActs));
 	document.querySelectorAll("a.clear").forEach(el => el.addEventListener("click", runPopupCommand(clearStorage)));
 	document.querySelector("input#search").addEventListener("input", searchChange);
+	document.querySelector("form#storedActsSearch").addEventListener("submit", runPopupCommand(launchJustelSearch));
+	document.querySelector("button#searchJustel").addEventListener("click", runPopupCommand(launchJustelSearch));
 	document.querySelector("a#clearSearch").addEventListener("click", runPopupCommand(async () => {
 		document.querySelector("input#search").value = "";
 		await searchChange();
 	}));
+	await searchChange();
 }
 
 function buildStoredActsControls(arrayOfActs) {
 	const fragment = document.createDocumentFragment();
 	const form = document.createElement("form");
+	form.id = "storedActsSearch";
 	form.autocomplete = "off";
 	const search = document.createElement("input");
 	search.id = "search";
-	search.placeholder = "Type text to filter acts";
+	search.placeholder = "Filter stored acts or search Justel";
+	search.setAttribute("aria-label", "Filter stored acts or search Justel");
 	search.autocomplete = "off";
 	search.autofocus = true;
 	const clearSearch = document.createElement("a");
@@ -219,17 +273,21 @@ function buildStoredActsControls(arrayOfActs) {
 
 async function searchChange(e) {
 	// Search for each term separated by a space
-	document.querySelector("a#clearSearch").style.display = document.querySelector("input#search").value ? "block" : "none";
+	const searchInput = document.querySelector("input#search");
+	const searchValue = searchInput.value;
+	document.querySelector("a#clearSearch").style.display = searchValue ? "block" : "none";
 	// Easter egg: reveal case law section (only when not already enabled)
-	const searchVal = document.querySelector("input#search").value.toLowerCase().trim();
+	const searchVal = searchValue.toLowerCase().trim();
 	const caselawCurrentlyEnabled = await getStorage("caselawEnabled");
 	if (!caselawCurrentlyEnabled) {
 		document.querySelector("div#caselawSection").style.display = searchVal === "enable beta testing" ? "block" : "none";
 	}
 	let somethingFound = false;
-	document.querySelectorAll("tbody > tr").forEach(tr => {
-		let act = tr.querySelector("a").text.toLowerCase();
-		if (!document.querySelector("input#search").value || document.querySelector("input#search").value.split(" ").every(el => act.indexOf(el.toLowerCase()) >= 0)) {
+	const rows = document.querySelectorAll("tbody > tr");
+	const terms = searchVal.split(/\s+/).filter(Boolean);
+	rows.forEach(tr => {
+		const act = `${tr.querySelector("td:first-child").textContent} ${tr.querySelector("td:nth-child(2) a").textContent}`.toLowerCase();
+		if (!terms.length || terms.every(term => act.includes(term))) {
 			somethingFound = true;
 			tr.style.display = "table-row";
 		}
@@ -239,11 +297,14 @@ async function searchChange(e) {
 	});
 	if (somethingFound) {
 		document.querySelector("thead > tr").style.display = "table-row";
+		document.querySelector("table").style.display = "table";
 		document.querySelector("div#noStoredActs").style.display = "none";
 	}
 	else {
 		document.querySelector("thead > tr").style.display = "none";
+		document.querySelector("table").style.display = "none";
 		document.querySelector("div#noStoredActs").style.display = "block";
+		updateJustelSearchState(searchValue, rows.length > 0);
 	}
 }
 
