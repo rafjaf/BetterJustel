@@ -3,6 +3,10 @@ window.BJ.caselawModule = function(ctx) {
 
 	const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/rafjaf/juportal_crawler/main/data/";
 	const FETCH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+	const CAS_ROLL_NUMBER_RE = /^\d{2}\/CAS\/\d{4,}$/i;
+	const LEGACY_ROLL_NUMBER_RE = /^[A-Z]\.(?:\d{2}|\d{4})\.\d{4,5}\.[A-ZNF](?:-[A-Z]\.(?:\d{2}|\d{4})\.\d{4,5}\.[A-ZNF])?$/i;
+	const LEGACY_MATTER_CODES = new Set(["C", "P", "S", "F", "D"]);
+	const ROLL_NUMBER_SYSTEMS = new Set(["CAS", "legacy", "unknown"]);
 
 	const FRENCH_MONTHS = [
 		"janvier", "février", "mars", "avril", "mai", "juin",
@@ -15,6 +19,69 @@ window.BJ.caselawModule = function(ctx) {
 		"CC":   "C.C.",
 		"CE":   "C.E.",
 	};
+
+	function stripTags(value) {
+		return value.replace(/<[^>]*>/g, "").trim();
+	}
+
+	/**
+	 * Retain Juportal roll numbers verbatim (apart from surrounding whitespace and
+	 * markup), while classifying both the legacy and June-2026 CAS systems.
+	 */
+	function getRollNumberMetadata(decision) {
+		const roleNumber = typeof decision.roleNumber === "string"
+			? stripTags(decision.roleNumber)
+			: "";
+		let inferredSystem = null;
+		if (roleNumber) {
+			if (CAS_ROLL_NUMBER_RE.test(roleNumber)) inferredSystem = "CAS";
+			else if (LEGACY_ROLL_NUMBER_RE.test(roleNumber)) inferredSystem = "legacy";
+			else inferredSystem = "unknown";
+		}
+
+		const suppliedSystem = typeof decision.rollNumberSystem === "string"
+			&& ROLL_NUMBER_SYSTEMS.has(decision.rollNumberSystem)
+			? decision.rollNumberSystem
+			: null;
+		// The number itself wins when it identifies the CAS system: CAS never conveys
+		// a legal matter, even if stale upstream metadata says otherwise.
+		const rollNumberSystem = inferredSystem === "CAS" ? "CAS" : (suppliedSystem || inferredSystem);
+
+		let matterFromRollNumber = null;
+		if (rollNumberSystem === "legacy" && roleNumber) {
+			const suppliedMatter = typeof decision.matterFromRollNumber === "string"
+				? decision.matterFromRollNumber.toUpperCase()
+				: null;
+			const prefix = roleNumber.charAt(0).toUpperCase();
+			matterFromRollNumber = LEGACY_MATTER_CODES.has(suppliedMatter)
+				? suppliedMatter
+				: (LEGACY_MATTER_CODES.has(prefix) ? prefix : null);
+		}
+
+		return { roleNumber, rollNumberSystem, matterFromRollNumber };
+	}
+
+	function sanitizeJuportalUrl(value) {
+		if (typeof value !== "string") return null;
+		try {
+			const url = new URL(value);
+			if (url.protocol !== "https:") return null;
+			if (url.hostname !== "juportal.be" && url.hostname !== "juportal.just.fgov.be") return null;
+			return url.href;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function sanitizeJuportalUrls(decision) {
+		const candidates = Array.isArray(decision.judgementUrls)
+			? decision.judgementUrls
+			: [];
+		const urls = candidates.map(sanitizeJuportalUrl).filter(Boolean);
+		const legacyUrl = sanitizeJuportalUrl(decision.url);
+		if (legacyUrl) urls.push(legacyUrl);
+		return Array.from(new Set(urls));
+	}
 
 	/**
 	 * Deduplicate near-identical abstracts.
@@ -109,11 +176,12 @@ window.BJ.caselawModule = function(ctx) {
 			for (const ecli of Object.keys(rawData[articleKey])) {
 				const decision = rawData[articleKey][ecli];
 				if (typeof decision !== "object" || decision === null) continue;
+				const rollNumberMetadata = getRollNumberMetadata(decision);
 				const sanitizedDecision = {
 					court: typeof decision.court === "string" ? decision.court.replace(/<[^>]*>/g, "") : "",
 					date: typeof decision.date === "string" ? decision.date.replace(/<[^>]*>/g, "") : "",
-					roleNumber: typeof decision.roleNumber === "string" ? decision.roleNumber.replace(/<[^>]*>/g, "") : "",
-					url: typeof decision.url === "string" && decision.url.match(/^https?:\/\//) ? decision.url : "",
+					...rollNumberMetadata,
+					judgementUrls: sanitizeJuportalUrls(decision),
 					abstractFR: null,
 					abstractNL: null,
 					relatedArticle: typeof decision.relatedArticle === "string"
@@ -447,6 +515,20 @@ window.BJ.caselawModule = function(ctx) {
 			.trim();
 	}
 
+	function getJuportalUrl(decision, language) {
+		const languageSuffix = `/${language.toUpperCase()}`;
+		const matchingUrl = decision.judgementUrls?.find(url => {
+			try {
+				return new URL(url).pathname.replace(/\/+$/, "").toUpperCase().endsWith(languageSuffix);
+			} catch (e) {
+				return false;
+			}
+		});
+		if (matchingUrl) return matchingUrl;
+		if (decision.judgementUrls?.length) return decision.judgementUrls[0];
+		return `https://juportal.just.fgov.be/content/ViewDecision.php?id=${encodeURIComponent(decision.ecli)}&lang=${language.toLowerCase()}`;
+	}
+
 	/**
 	 * Build the HTML for case-law abstracts for a given article.
 	 * Sorts decisions by date (most recent first).
@@ -484,17 +566,19 @@ window.BJ.caselawModule = function(ctx) {
 		for (const d of decisions) {
 			// Choose FR abstracts by priority, NL as fallback
 			let abstracts = [];
+			let abstractLanguage = "FR";
 			if (d.abstractFR && d.abstractFR.length > 0) {
 				abstracts = d.abstractFR;
 			} else if (d.abstractNL && d.abstractNL.length > 0) {
 				abstracts = d.abstractNL;
+				abstractLanguage = "NL";
 			}
 			if (!abstracts.length) continue;
 
 			const formattedDate = formatDateFrench(d.date);
 			const courtAbbr = COURT_ABBR_MAP[d.court] || d.court || "";
 			const roleNumber = d.roleNumber || "";
-			const juportalUrl = `https://juportal.just.fgov.be/content/ViewDecision.php?id=${encodeURIComponent(d.ecli)}&lang=fr`;
+			const juportalUrl = getJuportalUrl(d, abstractLanguage);
 			for (const abstract of abstracts) {
 				// Key on normalized text + role number: catches duplicates whether they share
 				// the same ECLI or not, and regardless of Unicode apostrophe/quote variants.
