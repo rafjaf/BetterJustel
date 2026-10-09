@@ -111,3 +111,9 @@ It makes use of the following open source libraries :
 	- fixed characters encoding when a search request is passed from popup window to Justel website
 - Version 0.5.2 :
 	- fixed links to modifying laws when page was saved offline
+	- annotation links are displayed in blue and underlined
+	- apostrophes immediately following a letter are converted to typographic apostrophes when copying text, while preserving rich text formatting
+	- Collapse, Expand and Jump remain visible when scrolling the table of contents, while the act loading status scrolls with its contents
+	- added an Article field with a clear button and a Jump button to move both the table of contents and the text to an article, including when its section is collapsed
+	- article title detection checks the pattern across the act to avoid mistaking an isolated paragraph without a final full stop for a title (e.g. Art. 1494 of the Judicial Code), including in already saved pages
+	- the Better Justel badge links to the project's GitHub page

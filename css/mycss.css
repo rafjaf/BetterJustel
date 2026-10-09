@@ -447,28 +447,64 @@ div#maincontent {
 div#toc {
 	position: relative;
 	flex: 0 0 auto;
-	padding-top: 20px;
 	width: 30%;
 	height: 100%;
 }
 div#toc div#btndiv {
-	margin-bottom: 10px;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 15px;
+	background: white;
+	border-bottom: 1px solid #dce3ea;
 }
 div#toc button {
-	margin-left: 15px;
 	border-radius: 8px;
 	background-color: lightgrey;
 	padding: 5px;
 }
-div#toc div#btndiv span {
-	padding-left: 20px; 
+div#toc form#article-jump {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+}
+div#toc input#article-number {
+	width: 120px;
+	padding: 5px 25px 5px 5px;
+	border: 1px solid #647283;
+	border-radius: 4px;
+	font: inherit;
+}
+div#toc .article-input {
+	position: relative;
+}
+div#toc button#clear-article {
+	position: absolute;
+	right: 3px;
+	top: 50%;
+	transform: translateY(-50%);
+	padding: 0 4px;
+	background: transparent;
+	font-size: 20px;
+	line-height: 1;
+}
+div#toc button#clear-article[hidden] {
+	display: none;
+}
+div#toc div#act-load-status {
+	padding: 8px 15px;
 	font-weight: bold;
 }
-div#toc div#btndiv span.true {
+div#toc div#act-load-status.true {
 	color: red; 
 }
 
-div#toc div#btndiv span.false {
+div#toc div#act-load-status.false {
 	color: blue; 
 }
 
@@ -595,7 +631,7 @@ annotation {
 	overflow: auto;
 }
 
-annotation a {
+body.better-justel annotation a {
 	color: blue;
 	cursor: pointer;
 	text-decoration: underline;

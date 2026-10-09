@@ -1,5 +1,37 @@
 window.BJ = window.BJ || {};
 window.BJ.displayModule = function(ctx) {
+	function literaryApostrophes(text) {
+		return text.replace(/(\p{L})'/gu, "$1’");
+	}
+
+	function handleCopy(event) {
+		const selection = document.getSelection();
+		if (!event.clipboardData || !selection?.toString()) { return; }
+		const text = selection.toString();
+		const corrected = literaryApostrophes(text);
+		if (corrected === text) { return; }
+		const container = document.createElement("div");
+		for (let i = 0; i < selection.rangeCount; i++) {
+			container.appendChild(selection.getRangeAt(i).cloneContents());
+		}
+		let previousCharacter = "";
+		function correctFragment(node) {
+			if (node.nodeType === Node.TEXT_NODE) {
+				node.textContent = literaryApostrophes(previousCharacter + node.textContent).slice(previousCharacter.length);
+				previousCharacter = node.textContent.slice(-1) || previousCharacter;
+				return;
+			}
+			const separatesParagraphs = /^(BR|DIV|P|LI|BLOCKQUOTE|H[1-6]|TR)$/.test(node.nodeName);
+			if (separatesParagraphs) { previousCharacter = ""; }
+			for (const child of node.childNodes) { correctFragment(child); }
+			if (separatesParagraphs) { previousCharacter = ""; }
+		}
+		correctFragment(container);
+		event.clipboardData.setData("text/plain", corrected);
+		event.clipboardData.setData("text/html", container.innerHTML);
+		event.preventDefault();
+	}
+
 	async function copyText(text) {
 		if (navigator.clipboard?.writeText) {
 			await navigator.clipboard.writeText(text);
@@ -78,8 +110,11 @@ window.BJ.displayModule = function(ctx) {
 		info.classList.add("act-header");
 		info.setAttribute("aria-label", "Act information and actions");
 
-		const brand = document.createElement("div");
+		const brand = document.createElement("a");
 		brand.className = "act-header__brand";
+		brand.href = "https://github.com/rafjaf/BetterJustel";
+		brand.target = "_blank";
+		brand.rel = "noopener noreferrer";
 		brand.textContent = "Better Justel";
 		brand.title = "Enhanced by Better Justel";
 		info.prepend(brand);
@@ -192,6 +227,23 @@ window.BJ.displayModule = function(ctx) {
 				wrappers: {},
 			};
 			let changesMade = false;
+			// Keep highlights and bookmarks attached when repairing a cached title.
+			for (const [oldTitle, title] of Object.entries(ctx.articleTitleAliases || {})) {
+				if (ctx.highlights.quotes[oldTitle]) {
+					const quotes = ctx.highlights.quotes[title] || [];
+					for (const quote of ctx.highlights.quotes[oldTitle]) {
+						if (!quotes.some(existing => existing.id === quote.id)) { quotes.push(quote); }
+					}
+					ctx.highlights.quotes[title] = quotes;
+					delete ctx.highlights.quotes[oldTitle];
+					changesMade = true;
+				}
+				if (ctx.highlights.quotes.bookmarks?.[oldTitle]) {
+					ctx.highlights.quotes.bookmarks[title] = ctx.highlights.quotes.bookmarks[oldTitle];
+					delete ctx.highlights.quotes.bookmarks[oldTitle];
+					changesMade = true;
+				}
+			}
 			for (let key in ctx.highlights.quotes) {
 				if (key == "bookmarks") {
 					for (let bookmark in ctx.highlights.quotes.bookmarks) {
@@ -292,9 +344,60 @@ window.BJ.displayModule = function(ctx) {
 			a.click();
 			a.remove();
 		});
+		// Build before the TOC so repaired cached article titles also appear there.
+		let content = ctx.buildContent(ctx.act.content);
 		// Add JSTree
 		$("div#toc").append("<div id='btndiv'><button id='btnCollapse'>Collapse</button><button id='btnExpand'>Expand</button>"
-							+ `<span class="${online}">${online ? "Act loaded from Justel" : "Act restored"}</span></div>`);
+							+ "<form id='article-jump'><div class='article-input'><input id='article-number' aria-label='Article' placeholder='Article' required><button id='clear-article' type='button' aria-label='Clear article' title='Clear article' hidden>×</button></div><button type='submit'>Jump</button></form></div>"
+							+ `<div id="act-load-status" class="${online}">${online ? "Act loaded from Justel" : "Act restored"}</div>`);
+		const articles = new Map();
+		function articleNumber(text) {
+			return text.trim().replace(/^Art(?:\.|icle)?\s*/i, "").replace(/\.+$/, "").toLowerCase();
+		}
+		function indexArticles(nodes) {
+			for (const node of nodes) {
+				if (node.type === "article") {
+					const number = node.text.match(/^Art(?:\.|icle)\s*([\w./:-]+)/i)?.[1]?.replace(/\.+$/, "");
+					if (number && !articles.has(articleNumber(number))) {
+						articles.set(articleNumber(number), node.id);
+					}
+				}
+				if (node.children) { indexArticles(node.children); }
+			}
+		}
+		indexArticles(ctx.act.content);
+		const articleInput = document.getElementById("article-number");
+		const clearArticle = document.getElementById("clear-article");
+		articleInput.addEventListener("input", function() {
+			articleInput.setCustomValidity("");
+			clearArticle.hidden = !articleInput.value;
+		});
+		clearArticle.addEventListener("click", function() {
+			articleInput.value = "";
+			articleInput.dispatchEvent(new Event("input"));
+			articleInput.focus();
+		});
+		document.getElementById("article-jump").addEventListener("submit", function(event) {
+			event.preventDefault();
+			const id = articles.get(articleNumber(articleInput.value));
+			if (!id) {
+				articleInput.setCustomValidity("This article was not found in this act.");
+				articleInput.reportValidity();
+				return;
+			}
+			const tree = $("div#jstree").jstree(true);
+			const node = tree.get_node(id);
+			tree.open_node(node.parents.filter(parent => parent !== "#"), false, 0);
+			tree.deselect_all(true);
+			tree.select_node(id);
+			requestAnimationFrame(() => {
+				const toc = document.getElementById("toc");
+				const anchor = document.getElementById(id + "_anchor");
+				const toolbarHeight = document.getElementById("btndiv").offsetHeight;
+				toc.scrollTop += anchor.getBoundingClientRect().top - toc.getBoundingClientRect().top
+					- toolbarHeight - (toc.clientHeight - toolbarHeight) / 2;
+			});
+		});
 		$("button#btnCollapse").on("click", function (event, data) {
 			$("div#jstree").jstree("close_all")
 		});
@@ -330,7 +433,6 @@ window.BJ.displayModule = function(ctx) {
 		el.style.display = "";
 		$("div#toc").append("<br><br>");
 		// Populate content of the page
-		let content = ctx.buildContent(ctx.act.content);
 		$("div#content").append(content);
 		// Resolve modifying-law links in cached article HTML as well as header links.
 		normalizeJustelLinks(document.querySelector("div#content"));
@@ -391,6 +493,8 @@ window.BJ.displayModule = function(ctx) {
 			}
 		});
 		// Hide margin annotations (Al., bookmarks) while text is selected
+		document.removeEventListener("copy", handleCopy);
+		document.addEventListener("copy", handleCopy);
 		document.addEventListener("selectionchange", function() {
 			const sel = window.getSelection();
 			if (sel && sel.toString().length > 0) {

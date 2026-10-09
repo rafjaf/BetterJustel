@@ -2,10 +2,64 @@ window.BJ = window.BJ || {};
 window.BJ.analyseModule = function(ctx) {
 
 	const HEADINGS_TYPE = ctx.HEADINGS_TYPE;
+	const ARTICLE_REGEX = /Art(?:\.|icle)\s?[LR]?(?:[IVX]+|\d+\w*)(?:(?:\.|\/|:|-)\d+\w*)*\.(?:.+[a-zéèA-Z]$)?/;
+	const ARTICLE_NUMBER_REGEX = /Art(?:\.|icle)\s?[LR]?(?:[IVX]+|\d+\w*)(?:(?:\.|\/|:|-)\d+\w*)*\./;
+	function firstArticleLine(html) {
+		const template = document.createElement("template");
+		template.innerHTML = html.split(/<br\s*\/?\s*>/i)[0];
+		template.content.querySelectorAll("sup").forEach(node => node.remove());
+		let first = template.content;
+		// Older cached acts can contain nested paragraph wrappers.
+		while (first.firstElementChild?.tagName === "DIV") { first = first.firstElementChild; }
+		return first.textContent.trim();
+	}
+	function detectArticleTitleStyle(nodes) {
+		let sampleSize = 0, titleCount = 0;
+		function visit(nodes) {
+			for (const node of nodes) {
+				if (node.type === "article") {
+					const line = firstArticleLine(node.content);
+					const number = line.match(ARTICLE_NUMBER_REGEX)?.[0];
+					const suffix = number && line.slice(line.indexOf(number) + number.length).trim();
+					// Exclude empty and repealed articles from the evidence.
+					if (suffix && /\p{L}/u.test(suffix)) {
+						sampleSize++;
+						if (node.explicitTitle || (line.match(ARTICLE_REGEX)?.[0].length || 0) > number.length) { titleCount++; }
+					}
+				}
+				if (node.children) { visit(node.children); }
+			}
+		}
+		visit(nodes);
+		// Require at least twelve usable articles and 90% without captions before
+		// treating missing final full stops as paragraph anomalies. For short or
+		// mixed acts, keep the established title detection behavior.
+		if (sampleSize < 12) { return "unknown"; }
+		if (titleCount / sampleSize <= 0.1) { return "untitled"; }
+		return titleCount / sampleSize >= 0.6 ? "titled" : "unknown";
+	}
+	function articleTitleRegex(node) {
+		return ctx.act.articleTitleStyle === "untitled" && !node.explicitTitle
+			? ARTICLE_NUMBER_REGEX : ARTICLE_REGEX;
+	}
+	function rememberTitleChange(oldTitle, caption) {
+		if (caption !== oldTitle) {
+			ctx.articleTitleAliases = ctx.articleTitleAliases || {};
+			ctx.articleTitleAliases[oldTitle] = caption;
+		}
+	}
+	function articleCaption(text, node) {
+		const caption = text.match(articleTitleRegex(node))?.[0] || text;
+		if (caption !== text && /\p{L}$/u.test(text)) {
+			rememberTitleChange(text, caption);
+		}
+		return caption;
+	}
 
 	function analyseContent() {
 		// Declarations
 		let currentParents = [], lastNode, counter = 1;
+		const completedNodes = new Set();
 		const ARTICLE_ANCHOR_TEXT = /^Art(?:\.|icle)\s*(?:[A-Z]+\.)?\d+\w*(?:(?:\.|\/|:|-)\d+\w*)*\.$/i;
 		// Internal function
 		function analyseHeading(n) {
@@ -108,9 +162,7 @@ window.BJ.analyseModule = function(ctx) {
 			// Sanitize text of the node
 			n.text = n.text.replace(/[\[\]]|[\(\)]|--+/g, "").replace(/\s\s/g, " ")
 				.replace(/(\d+(er)?\.)([A-Z])/g, "$1 $3");
-			const ARTICLE_REGEX = /Art(?:\.|icle)\s?[LR]?(?:[IVX]+|\d+\w*)(?:(?:\.|\/|:|-)\d+\w*)*\.(?:.+[a-zéèA-Z]$)?/
-			let m = n.text.match(ARTICLE_REGEX);
-			if (m) { n.text = m[0]; }
+			n.text = articleCaption(n.text, n);
 			// Rules depending on node type
 			if (n.type == "article") {
 				const INDENT_PREFIX = "^(?:<b>.+<\\/b>)?(?:\\[(<sup>.+<\\/sup>)?\\s?|\\()?";
@@ -133,9 +185,10 @@ window.BJ.analyseModule = function(ctx) {
 				// First loop:
 				for (let i = 0; i < content.length; i++) {
 					// Put "Art." and its title in bold
-					let m = content[i].match(ARTICLE_REGEX);
+					const titleRegex = articleTitleRegex(n);
+					let m = content[i].match(titleRegex);
 					if (m) {
-						content[i] = content[i].replace(ARTICLE_REGEX, "<b>$&</b>");
+						content[i] = content[i].replace(titleRegex, "<b>$&</b>");
 					}
 					// Search for indent
 					let t = INDENT_TYPE.findIndex(el => content[i].match(el));
@@ -249,6 +302,8 @@ window.BJ.analyseModule = function(ctx) {
 			article.titleOngoing = true;
 			article.content = n.textContent;
 			article.level = "article";
+			// analyseHeading marks article captions supplied as separate source headings.
+			article.explicitTitle = Boolean(n.getAttribute?.("addBr") || n.nextElementSibling?.getAttribute("addBr"));
 			if (!currentParents.length) {
 				// If there is no heading to attach the article, create a fake heading
 				let heading = {}
@@ -292,12 +347,12 @@ window.BJ.analyseModule = function(ctx) {
 					|| ARTICLE_ANCHOR_TEXT.test(n.textContent.trim()));
 			if ( (n.nodeName == "A") && (n.name) && n.name.startsWith("LNK") && !isArticleAnchor ) {
 				// This is a heading
-				if (lastNode) { beautify(lastNode); }
+				if (lastNode) { completedNodes.add(lastNode); }
 				analyseHeading(n);
 			}
 			else if (isArticleAnchor) {
 				// This is an article, to be attached to last heading
-				if (lastNode) { beautify(lastNode); }
+				if (lastNode) { completedNodes.add(lastNode); }
 				lastNode = buildLastNode(n);
 				currentParents.slice(-1)[0].children.push(lastNode);
 				counter += 1;
@@ -361,7 +416,7 @@ window.BJ.analyseModule = function(ctx) {
 							if ( text.split(" ")?.[1].match(/^[\dIVXL]+\./) ) { // Avoid recognising as heading something like "partie concernée"
 								console.log("Added as heading");
 								lastNode.content += "<br><br>";
-								beautify(lastNode);
+								completedNodes.add(lastNode);
 								n.textContent = n.textContent.trim();
 								analyseHeading(n);
 							}
@@ -422,7 +477,11 @@ window.BJ.analyseModule = function(ctx) {
 			}
 		}
 		if (lastNode) {
-			beautify(lastNode);
+			completedNodes.add(lastNode);
+		}
+		ctx.act.articleTitleStyle = detectArticleTitleStyle(ctx.act.content);
+		for (const node of completedNodes) { beautify(node); }
+		if (lastNode) {
 			if ( (lastNode.type == "article") && !lastNode.text.match(/Art\.?\s?[A-Z\d]/) ) {
 				let correctText = lastNode.content.match(/(<div style='padding-left: -20px;'><b>)(.+?)(<\/b>)/)?.[2];
 				if (correctText) {
@@ -432,13 +491,33 @@ window.BJ.analyseModule = function(ctx) {
 		}
 	}
 
-	function buildContent(nodesArray) {
+	function buildContent(nodesArray, nested = false) {
+		if (!nested) { ctx.act.articleTitleStyle = detectArticleTitleStyle(nodesArray); }
 		let content = "";
 		for (let n of nodesArray) {
+			if (n.type === "article") {
+				// Also repair titles already formatted and saved by an older version.
+				n.text = articleCaption(n.text, n);
+				// Restore mixed-case captions cached with only the number in bold.
+				n.content = n.content.replace(/^(<div\b[^>]*>)<b>(Art(?:\.|icle)\s[^<]*)<\/b>([^<]*)(<\/div>)/, function(markup, opening, title, rest, closing) {
+					const line = title + rest;
+					const caption = line.match(articleTitleRegex(n))?.[0];
+					if (!caption) { return markup; }
+					const prefix = n.text.match(/^Art(?:\.|icle)\s*/)?.[0];
+					const restoredTitle = prefix ? caption.replace(/^Art(?:\.|icle)\s*/, prefix) : caption;
+					rememberTitleChange(n.text, restoredTitle);
+					n.text = restoredTitle;
+					return `${opening}<b>${caption}</b>${line.slice(caption.length)}${closing}`;
+				});
+				n.content = n.content.replace(/<b>(Art(?:\.|icle)\s[^<]*)<\/b>/, function(markup, title) {
+					const caption = title.match(articleTitleRegex(n))?.[0];
+					return caption ? `<b>${caption}</b>${title.slice(caption.length)}` : markup;
+				});
+			}
 			const bookmark = n.type == "article" ? "<span class='bookmark'></span>" : "";
 			content += `<div id="anchor_${n.id}" class="${n.level}">${bookmark}${n.content}</div>`;
 			if (n.children?.length) {
-				content += buildContent(n.children);
+				content += buildContent(n.children, true);
 			}
 		}
 		return content;
