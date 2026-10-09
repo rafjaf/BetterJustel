@@ -109,3 +109,5 @@ It makes use of the following open source libraries :
 - Version 0.5.1 :
 	- implemented new roll number system for the Court of cassation (e.g. 26/CAS/0264 instead of C.26.00264.F). Thanks to [Céline Joisten](https://www.linkedin.com/posts/c%C3%A9line-joisten-32489314a_aviez-vous-remarqu%C3%A9-depuis-le-share-7500121372870832128-Z7f4/) for the useful explanation.
 	- fixed characters encoding when a search request is passed from popup window to Justel website
+- Version 0.5.2 :
+	- fixed links to modifying laws when page was saved offline

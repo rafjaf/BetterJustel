@@ -16,9 +16,8 @@ window.BJ.displayModule = function(ctx) {
 		if (!copied) { throw new Error("Clipboard access was refused"); }
 	}
 
-	function normalizeInfoLinks() {
-		const info = document.querySelector("div#info");
-		if (!info) { return; }
+	function normalizeJustelLinks(container) {
+		if (!container) { return; }
 
 		let justelBase;
 		try {
@@ -28,7 +27,7 @@ window.BJ.displayModule = function(ctx) {
 			justelBase = new URL("https://www.ejustice.just.fgov.be/cgi_loi/");
 		}
 
-		for (const link of info.querySelectorAll("a[href]")) {
+		for (const link of container.querySelectorAll("a[href]")) {
 			const href = link.getAttribute("href")?.trim();
 			if (!href || href.startsWith("#") || /^[a-z][a-z\d+.-]*:/i.test(href)) {
 				continue;
@@ -281,7 +280,7 @@ window.BJ.displayModule = function(ctx) {
 		 });
 		// Build document info
 		$("div#info").append(ctx.act.info);
-		normalizeInfoLinks();
+		normalizeJustelLinks(document.querySelector("div#info"));
 		setupCopyEli();
 		enhanceInfoPanel();
 		$("div#info a#btnSavePDF").on("click", function (event, date) {
@@ -333,6 +332,8 @@ window.BJ.displayModule = function(ctx) {
 		// Populate content of the page
 		let content = ctx.buildContent(ctx.act.content);
 		$("div#content").append(content);
+		// Resolve modifying-law links in cached article HTML as well as header links.
+		normalizeJustelLinks(document.querySelector("div#content"));
 		$("div#content").append("<br><br>");
 		// Button to clear DB
 		$("a#clearDB").on("click", async function() {
