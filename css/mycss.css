@@ -474,7 +474,7 @@ div#toc form#article-jump {
 	margin: 0;
 }
 div#toc input#article-number {
-	width: 120px;
+	width: 105px;
 	padding: 5px 25px 5px 5px;
 	border: 1px solid #647283;
 	border-radius: 4px;
@@ -882,4 +882,159 @@ div.caselaw-header span.caselaw-related-ref {
 .jstree-default .jstree-anchor.has-caselaw-related-only {
 	background-color: #e8dff0 !important;
 	border-radius: 2px;
+}
+
+/* A sticky margin column keeps history controls within their own article. */
+div#content {
+	padding-left: 55px;
+}
+div#content div.article.article-has-history {
+	display: grid;
+	grid-template-columns: 0px minmax(0, 1fr);
+	transition: grid-template-columns 220ms ease;
+}
+div#content div.article.article-history-open {
+	grid-template-columns: 116px minmax(0, 1fr);
+	min-height: 85px;
+}
+.article-current-body, .article-history-body {
+	grid-column: 2;
+	grid-row: 1;
+	min-width: 0;
+}
+.article-history-rail {
+	grid-column: 1;
+	grid-row: 1;
+	align-self: start;
+	position: sticky;
+	top: 8px;
+	width: 48px;
+	margin-left: -48px;
+	z-index: 1;
+}
+.article-history-row {
+	display: grid;
+	grid-template-columns: 21px 21px;
+	gap: 2px;
+	align-items: center;
+}
+.article-history-clock {
+	width: 21px;
+	height: 21px;
+	padding: 1px;
+	border: 0;
+	background: transparent;
+	color: #555;
+	cursor: pointer;
+	opacity: 0;
+}
+.article-history-clock svg {
+	width: 18px;
+	height: 18px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+div.article .article-history-row span.bookmark {
+	position: static;
+	margin: 0;
+	width: 21px;
+	text-align: center;
+}
+div.article:hover .article-history-clock,
+div.article:focus-within .article-history-clock,
+div.article.article-history-open .article-history-clock,
+div.article:focus-within span.bookmark {
+	opacity: 1;
+}
+body.has-selection div.article:hover .article-history-clock {
+	opacity: 0;
+}
+.article-history-open .article-history-rail {
+	width: 132px;
+	margin-left: -28px;
+}
+.article-history-open .article-history-row {
+	grid-template-columns: 21px minmax(0, 1fr) 21px;
+	gap: 0;
+}
+div.article.article-history-open span.bookmark {
+	opacity: 1;
+}
+.article-history-date {
+	display: none;
+	font-size: 12px;
+	line-height: 21px;
+	font-variant-numeric: tabular-nums;
+	color: #555;
+	white-space: nowrap;
+	text-align: center;
+}
+.article-history-controls {
+	display: none;
+	margin-top: 5px;
+	font-size: 10px;
+	line-height: 1.35;
+	color: #666;
+}
+.article-history-controls input {
+	display: block;
+	width: 100%;
+	margin: 0;
+	accent-color: #587581;
+	cursor: pointer;
+}
+.article-history-ticks {
+	position: relative;
+	height: 7px;
+	margin: 0 8px 4px;
+}
+.article-history-tick {
+	position: absolute;
+	top: 0;
+	height: 5px;
+	border-left: 1px solid #89979e;
+	transform: translateX(-0.5px);
+}
+.article-history-status {
+	display: block;
+}
+body.better-justel .article-history-status a {
+	color: #426875;
+	text-decoration: underline;
+}
+.article-history-open .article-history-date,
+.article-history-open .article-history-controls {
+	display: block;
+}
+.article-history-body {
+	color: #626970;
+	border-left: 2px solid #b8c1c6;
+	/* Leave space inside the border for the existing Al. margin labels. */
+	padding-left: 35px;
+}
+.article-current-body[hidden], .article-history-body[hidden] {
+	display: none;
+}
+.article-history-clock.loading svg {
+	animation: article-history-spin 900ms linear infinite;
+}
+@keyframes article-history-spin {
+	to { transform: rotate(-360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+	div#content div.article.article-has-history { transition: none; }
+	.article-history-clock.loading svg { animation-duration: 2s; }
+}
+div.article.article-has-history > .caselaw-block {
+	grid-column: 2;
+}
+div.article.article-historical > .caselaw-block {
+	display: none;
+}
+div#content .article-has-history > .article-current-body > div:first-child,
+div#content .article-has-history > .article-history-body > div:first-child {
+	margin-top: 0;
 }

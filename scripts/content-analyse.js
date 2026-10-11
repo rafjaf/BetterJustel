@@ -56,7 +56,7 @@ window.BJ.analyseModule = function(ctx) {
 		return caption;
 	}
 
-	function analyseContent() {
+	function analyseContent(sourceDocument = document) {
 		// Declarations
 		let currentParents = [], lastNode, counter = 1;
 		const completedNodes = new Set();
@@ -321,8 +321,8 @@ window.BJ.analyseModule = function(ctx) {
 		}
 		// Main analyseContent
 		ctx.addLoading("Analysing content of the act");
-		document.querySelector("div#list-title-3 h2").remove();
-		let contentNodes = Array.from(document.querySelector("div#list-title-3").childNodes);
+		sourceDocument.querySelector("div#list-title-3 h2")?.remove();
+		let contentNodes = Array.from(sourceDocument.querySelector("div#list-title-3").childNodes);
 		// Also correct p elements which contain articles 
 		const WRONG_LAST_NODENAME = ["ERRATUM,M.B.", "I", "BR&GT;<BR", "L", "P", "AR"];
 		let i = 0;
@@ -514,7 +514,7 @@ window.BJ.analyseModule = function(ctx) {
 					return caption ? `<b>${caption}</b>${title.slice(caption.length)}` : markup;
 				});
 			}
-			const bookmark = n.type == "article" ? "<span class='bookmark'></span>" : "";
+			const bookmark = n.type == "article" ? "<span class='bookmark' title='Toggle bookmark for this article'></span>" : "";
 			content += `<div id="anchor_${n.id}" class="${n.level}">${bookmark}${n.content}</div>`;
 			if (n.children?.length) {
 				content += buildContent(n.children, true);

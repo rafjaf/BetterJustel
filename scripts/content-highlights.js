@@ -155,6 +155,13 @@ window.BJ.highlightsModule = function(ctx) {
 		let s = document.getSelection();
 		let beginParentArticle = $(s.anchorNode).parents(".article");
 		let endParentArticle = $(s.focusNode).parents(".article");
+		// Archived text is read-only; keep highlights attached to the current text.
+		if (event.target.closest?.(".article-history-controls, .article-history-clock, .article-history-date, .article-historical .article-history-body")
+			|| beginParentArticle[0]?.classList.contains("article-historical")) {
+			$("div#toolbar").hide();
+			ctx.currentRange = undefined;
+			return;
+		}
 		// Only process selection if it exists and within the same article
 		if (!s.isCollapsed && beginParentArticle.length && endParentArticle && beginParentArticle[0] == endParentArticle[0]) {
 			// Show toolbar

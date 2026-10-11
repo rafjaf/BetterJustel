@@ -1,7 +1,7 @@
 const DROPBOX_CLIENT_ID = "bxh6gtfvn361dbe";
 const DROPBOX_REDIRECT_URL = "https://www.ejustice.just.fgov.be/eli/";
 
-import {getStorage, setStorage, getAllHighlights, requestDataCollectionPermissions} from "../scripts/util.js";
+import {getStorage, setStorage, getAllHighlights, clearActArchives, requestDataCollectionPermissions} from "../scripts/util.js";
 import {parseJustelQuery, buildJustelSearchUrl} from "../scripts/popup-search.js";
 
 function getDownload() {
@@ -173,6 +173,8 @@ async function populateListOfStoredActs() {
 		let proceed = confirm("Press OK to remove from the offline database " + act.innerText + ". Highlights will not be affected");
 		if (proceed) {
 			let eli = act.href;
+			await clearActArchives(eli);
+			await chrome.storage.local.remove(eli);
 			// Clear text content in database
 			let listOfActs = await getStorage("updateInfo");
 			delete listOfActs[eli];

@@ -7,11 +7,12 @@ build/
 dist/
 doc/
 node_modules/
+tests/
 *.map
+*.md
 *.zip
 .DS_Store
 .packageignore
 manifest.json
 manifest.chrome.json
 manifest.firefox.json
-README.md

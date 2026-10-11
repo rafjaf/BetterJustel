@@ -50,3 +50,12 @@ export async function requestDataCollectionPermissions(dataTypes) {
 
 	return browser.permissions.request({ data_collection: missing });
 }
+
+// Store archives in the same extension-local database as current acts.
+export async function clearActArchives(eli) {
+	const prefix = "archive-" + eli + ":";
+	// Invalidate in-flight downloads in open tabs before removing saved pages.
+	await chrome.storage.local.set({["archive-reset-" + eli]: Date.now()});
+	const storage = await chrome.storage.local.get(null);
+	await chrome.storage.local.remove(Object.keys(storage).filter(key => key.startsWith(prefix)));
+}

@@ -20,8 +20,8 @@
 		headingsWhoseTypeNeedsToBeDefined: [],
 	};
 
-	let {getStorage, setStorage, getAllHighlights} = await import(chrome.runtime.getURL('scripts/util.js'));
-	Object.assign(ctx, {getStorage, setStorage, getAllHighlights});
+	let {getStorage, setStorage, getAllHighlights, clearActArchives} = await import(chrome.runtime.getURL('scripts/util.js'));
+	Object.assign(ctx, {getStorage, setStorage, getAllHighlights, clearActArchives});
 
 	// Initialize modules
 	const {delay, showStatusMessage, updateStatusMessage, findObjectById, addLoading} = BJ.helpersModule();
@@ -40,6 +40,9 @@
 	Object.assign(ctx, {loadAndDisplayCaseLaw, clearCaselawFetchFlag, isInCaselawBlock, saveCaselawHighlight, removeCaselawHighlight, updateCaselawHighlight});
 
 	const {analyseFirstInfo, analyseFurtherInfo} = BJ.infoModule(ctx);
+
+	const {setupArticleHistory, clearArticleHistory} = BJ.historyModule(ctx);
+	Object.assign(ctx, {setupArticleHistory, clearArticleHistory});
 
 	const {displayContent} = BJ.displayModule(ctx);
 

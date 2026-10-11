@@ -126,6 +126,8 @@ window.BJ.infoModule = function(ctx) {
 	}
 
 	function analyseFurtherInfo() {
+		// Keep history metadata with the act for cached and offline browsing.
+		Object.assign(ctx.act, BJ.historyMetadata(document, ctx.act.eli));
 		// Original and consolidated PDF
 		let originalPDF = Array.from(document.querySelectorAll("div.links-box a")).filter(a => a.href.indexOf("/mopdf") > -1)[0]?.href;
 		let consolidatedPDF = Array.from(document.querySelectorAll("div.links-box a")).filter(a => a.href.indexOf("/img_l/pdf") > -1)[0]?.href;

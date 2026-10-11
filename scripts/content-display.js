@@ -437,8 +437,10 @@ window.BJ.displayModule = function(ctx) {
 		// Resolve modifying-law links in cached article HTML as well as header links.
 		normalizeJustelLinks(document.querySelector("div#content"));
 		$("div#content").append("<br><br>");
+		ctx.setupArticleHistory?.();
 		// Button to clear DB
 		$("a#clearDB").on("click", async function() {
+			await ctx.clearArticleHistory?.();
 			await ctx.setStorage(ctx.act.eli, {});
 			ctx.updateInfo[ctx.act.eli].act = false;
 			await ctx.setStorage("updateInfo", ctx.updateInfo);

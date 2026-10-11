@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Article history regression checks</title>
+<link rel="stylesheet" href="../css/mycss.css">
+<script src="../scripts/lib/jquery.min.js"></script>
+<script src="../scripts/content-analyse.js"></script>
+<script src="../scripts/content-history.js"></script>
+<script src="../scripts/content-highlights.js"></script>
+<script src="fixtures/history-data.js"></script>
+</head>
+<body class="better-justel">
+<div id="content"></div>
+<script type="module">
+import {clearActArchives} from '../scripts/util.js';
+const checks = window.historyChecks = [];
+const check = (name, result) => { checks.push({name, passed: Boolean(result)}); if (!result) throw new Error(name); };
+const waitFor = async predicate => {
+  const deadline = Date.now() + 5000;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('Timed out waiting for history');
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+};
+const eli = 'https://www.ejustice.just.fgov.be/eli/loi/1967/10/10/1967101052/justel';
+let stored = {}, listeners = [], requested = [], failFetch = false;
+window.chrome = {storage: {
+  local: {
+    get: async keys => keys === null ? {...stored} : Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(k => [k, stored[k]])),
+    set: async values => { Object.assign(stored, values); listeners.forEach(fn => fn(Object.fromEntries(Object.entries(values).map(([k, v]) => [k, {newValue: v}])), 'local')); },
+    remove: async keys => { (Array.isArray(keys) ? keys : [keys]).forEach(k => delete stored[k]); }
+  },
+  onChanged: {addListener: fn => listeners.push(fn)}
+}};
+window.fetch = async url => {
+  requested.push(new URL(url).searchParams.get('arch'));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  if (failFetch) throw new Error('Simulated network outage');
+  const fixture = window.historyFixtures[new URL(url).searchParams.get('arch')];
+  if (!fixture) throw new Error('Unexpected archive download');
+  return new Response(fixture.html, {headers: {'content-type': 'text/html; charset=UTF-8'}});
+};
+const currentHTML = '<div><b>Art. 23.</b> <span class="yellow" id="saved-highlight">Latest highlighted text.</span></div><div>----------</div>'
+  + '<div>(1)&lt;L 2015-10-19/01, art. 2, 015; En vigueur : 01-11-2015&gt;</div>'
+  + '<div>(2)&lt;L 2018-12-21/09, art. 199, 022; En vigueur : 10-01-2019&gt;</div>';
+const node = {id: 'history23', type: 'article', level: 'article', text: 'Art. 23.', content: currentHTML};
+const ctx = {
+  act: {eli, lastUpdate: '2026-04-02', archiveURL: historyFixtures['030'].url, entryIntoForce: '1970-11-01', content: [node,
+    {id: 'unchanged', type: 'article', text: 'Art. 24.', content: '<div><b>Art. 24.</b> Unchanged text.</div>'}]},
+  HEADINGS_TYPE: ['partie', 'livre', 'titre', 'sous-titre', 'chapitre', 'section', 'sous-section', 'paragraphe', '§'],
+  highlights: {selected: [], wrappers: {}, quotes: {}},
+  getStorage: async key => stored[key], setStorage: async (key, value) => { stored[key] = value; }, clearActArchives
+};
+function mount() {
+  document.getElementById('content').innerHTML = '<div id="anchor_history23" class="article bookmark"><span class="bookmark"></span>' + currentHTML + '</div>'
+    + '<div id="anchor_unchanged" class="article">' + ctx.act.content[1].content + '</div><div id="toolbar" style="display:none"></div>';
+  const history = BJ.historyModule(ctx);
+  history.setupArticleHistory();
+  return history;
+}
+try {
+  check('French entry date and ISO legacy dates', BJ.historyDate('1 novembre 1970') === '1970-11-01' && BJ.historyDate('1989-01-01') === '1989-01-01');
+  check('Legacy amendment dates differ from modifying-law adoption dates', BJ.historyArticleDates('&lt;L 1989-01-12/30, art. 2, 003; 1989-01-01&gt;')[0] === '1989-01-01');
+  check('Undetermined dates stay unknown', BJ.historyArticleDates('&lt;L 1989-01-12/30, En vigueur : indéterminée&gt;').length === 0);
+  check('Ranges, subdivisions and exact article matching', BJ.historyMatchesArticle('1101-1123 ; 1130***32quater/2,§4', '1110') && BJ.historyMatchesArticle('1130,L2', '1130') && !BJ.historyMatchesArticle('1130bis***11300', '1130') && BJ.historyMatchesArticle('32quater/2,§4', '32quater/2'));
+  check('Archive URLs reject other hosts and non-archive links', !BJ.historyURL('https://example.org/article.pl?arch=1', eli) && !BJ.historyURL('article.pl?cn_search=2015010101', eli));
+  const history = mount();
+  const article = document.getElementById('anchor_history23');
+  const clock = article.querySelector('button');
+  const slider = article.querySelector('input');
+  const date = article.querySelector('.article-history-date');
+  const saved = document.getElementById('saved-highlight');
+  check('Unchanged articles have no clock; downloads are lazy', !document.querySelector('#anchor_unchanged button') && !requested.length);
+  clock.click();
+  check('Opening spins the clock and disables the slider while loading', clock.classList.contains('loading') && slider.disabled && clock.getAttribute('aria-expanded') === 'true');
+  await waitFor(() => !slider.disabled);
+  check('Only the index and the two relevant archives were downloaded', requested.slice().sort().join(',') === '014,021,030');
+  check('Slider markers show all versions before dragging', article.querySelectorAll('.article-history-tick').length === 3 && article.querySelector('.article-history-status').textContent.includes('3/3'));
+  check('The bookmark has a tooltip', article.querySelector('.bookmark').title.includes('bookmark'));
+  check('Latest version is selected with three positions', slider.max === '2' && slider.value === '2' && date.textContent === '10/01/2019' && !clock.classList.contains('loading'));
+  const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+  await new Promise(resolve => setTimeout(resolve, 250));
+  const center = element => { const r = element.getBoundingClientRect(); return r.left + r.width / 2; };
+  check('Date is centered between the clock and bookmark', Math.abs(center(date) - (center(clock) + center(article.querySelector('.bookmark'))) / 2) < 1);
+  const pane = document.getElementById('content'), originalStyle = pane.style.cssText;
+  pane.style.cssText = 'height:240px;width:700px;overflow-y:auto';
+  const spacer = document.createElement('section'); spacer.style.height = '800px'; article.querySelector('.article-current-body').appendChild(spacer);
+  const after = document.createElement('section'); after.style.height = '300px'; pane.appendChild(after);
+  const rail = article.querySelector('.article-history-rail');
+  pane.scrollTop = 100; await nextFrame(); const pinnedTop = rail.getBoundingClientRect().top;
+  pane.scrollTop = 200; await nextFrame();
+  check('The entire history column stays visible while its article scrolls', Math.abs(rail.getBoundingClientRect().top - pinnedTop) < 1 && article.getBoundingClientRect().top < pane.getBoundingClientRect().top);
+  pane.scrollTop += article.getBoundingClientRect().bottom - pane.getBoundingClientRect().top + 30; await nextFrame();
+  check('Sticky controls leave the viewport at the end of their article', rail.getBoundingClientRect().bottom < pane.getBoundingClientRect().top);
+  spacer.remove(); after.remove(); pane.scrollTop = 0; pane.style.cssText = originalStyle;
+  slider.value = 0; slider.dispatchEvent(new Event('input'));
+  check('Original version is formatted, dated and visibly historical', date.textContent === '01/11/1970' && article.classList.contains('article-historical') && article.querySelector('.article-history-body b').textContent === 'Art. 23.' && article.querySelector('.article-current-body').hidden);
+  const archivedBody = article.querySelector('.article-history-body');
+  const subparagraph = document.createElement('div'); subparagraph.innerHTML = '<span class="subpar">Al. 2</span>Another paragraph.'; archivedBody.appendChild(subparagraph);
+  check('Archived paragraph labels stay inside the vertical border', subparagraph.querySelector('.subpar').getBoundingClientRect().left > archivedBody.getBoundingClientRect().left + 2);
+  check('Archived version links to its source archive in a new tab', article.querySelector('.article-history-status a').href === historyFixtures['014'].url && article.querySelector('.article-history-status a').target === '_blank');
+  check('Archive links remain visibly underlined after the page reset', getComputedStyle(article.querySelector('.article-history-status a')).textDecorationLine.includes('underline'));
+  const range = document.createRange(); range.selectNodeContents(article.querySelector('.article-history-body'));
+  getSelection().removeAllRanges(); getSelection().addRange(range);
+  await BJ.highlightsModule(ctx).manageHighlights({target: article.querySelector('.article-history-body')});
+  check('Selecting archive text cannot create current-text highlights', !ctx.currentRange && document.getElementById('toolbar').style.display === 'none');
+  getSelection().removeAllRanges();
+  slider.value = 1; slider.dispatchEvent(new Event('input'));
+  check('Intermediate version has its own date and text', date.textContent === '01/11/2015' && article.querySelector('.article-history-body').textContent.includes('fondement juridique invoqué'));
+  const rect = slider.getBoundingClientRect();
+  slider.dispatchEvent(new PointerEvent('pointermove', {clientX: rect.left + 8}));
+  check('Hover previews dates without replacing the selected text', date.textContent === '01/11/1970' && slider.value === '1');
+  slider.dispatchEvent(new PointerEvent('pointerleave'));
+  check('Leaving the slider restores the selected date', date.textContent === '01/11/2015');
+  clock.click();
+  check('Closing restores the original highlighted DOM', saved === document.getElementById('saved-highlight') && !article.querySelector('.article-current-body').hidden && !article.classList.contains('article-historical'));
+  clock.click();
+  check('Reopening uses in-memory history', requested.length === 3);
+  const cachedCount = Object.keys(stored).filter(k => k.startsWith('archive-' + eli + ':')).length;
+  check('Full downloaded pages are saved separately', cachedCount === 3 && stored['archive-' + eli + ':014'].html.includes('Fiche des modifications'));
+  failFetch = true;
+  const restored = mount();
+  document.querySelector('#anchor_history23 button').click();
+  await waitFor(() => !document.querySelector('#anchor_history23 input').disabled);
+  check('A new page can restore archives with the network unavailable', requested.length === 3);
+  stored['highlights-' + eli] = {preserved: true};
+  stored['archive-https://example.org/other:001'] = {html: 'other act'};
+  await restored.clearArticleHistory();
+  check('Clear storage removes this act archives while preserving highlights and other acts', !Object.keys(stored).some(k => k.startsWith('archive-' + eli + ':')) && stored['highlights-' + eli].preserved && stored['archive-https://example.org/other:001']);
+  const retryClock = document.querySelector('#anchor_history23 button');
+  retryClock.click();
+  await waitFor(() => !retryClock.classList.contains('loading'));
+  check('Failed downloads stop spinning and expose a retry', document.querySelector('#anchor_history23 .article-history-status').textContent.includes('retry') && document.querySelector('#anchor_history23 input').disabled);
+  failFetch = false;
+  retryClock.click(); retryClock.click();
+  await waitFor(() => !document.querySelector('#anchor_history23 input').disabled);
+  check('Retry completes after connectivity returns', document.querySelector('#anchor_history23 input').max === '2');
+  // A future amendment adds an archive/index key without discarding older pages.
+  const oldCount = requested.length;
+  ctx.act.lastUpdate = '2027-01-01';
+  ctx.act.archiveURL = historyFixtures['030'].url.replace('arch=030', 'arch=031');
+  historyFixtures['031'] = {...historyFixtures['030'], url: ctx.act.archiveURL,
+    html: historyFixtures['030'].html.replace('Fiche des modifications</h2>', 'Fiche des modifications</h2><p>Modifié par LOI du 01-01-2027<br>Art. 23<br>En vigueur jusqu\'au 01-01-2027<a href=\"' + historyFixtures['030'].url + '\">Version archivée n° 030</a></p>')};
+  mount(); document.querySelector('#anchor_history23 button').click();
+  await waitFor(() => !document.querySelector('#anchor_history23 input').disabled);
+  check('A newer act refreshes the index and reuses snapshots including the former index', requested.length === oldCount + 1 && requested.at(-1) === '031');
+  const beforeCorrection = requested.length;
+  ctx.act.lastUpdate = '2027-02-01';
+  mount(); document.querySelector('#anchor_history23 button').click();
+  await waitFor(() => !document.querySelector('#anchor_history23 input').disabled);
+  check('A correction refreshes the index even when its archive number is unchanged', requested.length === beforeCorrection + 1 && stored['archive-' + eli + ':031'].indexUpdate === '2027-02-01');
+  // Clearing storage during a fetch must not repopulate it on completion.
+  await clearActArchives(eli);
+  mount(); document.querySelector('#anchor_history23 button').click();
+  await clearActArchives(eli);
+  await waitFor(() => !document.querySelector('#anchor_history23 button').classList.contains('loading'));
+  check('Clear storage invalidates in-flight downloads', !Object.keys(stored).some(k => k.startsWith('archive-' + eli + ':')));
+  // A real-world insertion omitted from the list of modified articles.
+  ctx.act = {eli, lastUpdate: '2024-02-01', entryIntoForce: '1980-10-01', archiveURL: historyFixtures['030'].url.replace('arch=030', 'arch=060'), content: [
+    {id: 'insertion6ter', type: 'article', text: 'Art. 6ter.', content: '<div><b>Art. 6ter.</b> &lt;Inséré par L 2001-07-13/34, art. 6; 01-01-2002&gt; Inserted text.</div>'}
+  ]};
+  const insertionURL = historyFixtures['030'].url.replace('arch=030', 'arch=018');
+  historyFixtures['060'] = {url: ctx.act.archiveURL, html: '<div id="list-title-3"><h2>Texte</h2><a name="Art.6ter">Art.</a><a> 6ter</a>. Inserted text.<br></div>'
+    + '<div><h2>Fiche des modifications</h2><p>Modifié par LOI du 13-07-2001 publié le 03-08-2001<br>Art. modifié 6<br>En vigueur jusqu\'au 01-01-2002<a href="' + insertionURL + '">Version archivée n° 018</a></p></div>'};
+  historyFixtures['018'] = {...historyFixtures['014'], url: insertionURL};
+  document.getElementById('content').innerHTML = '<div id="anchor_insertion6ter" class="article"><span class="bookmark"></span>' + ctx.act.content[0].content + '</div><div id="toolbar" style="display:none"></div>';
+  BJ.historyModule(ctx).setupArticleHistory();
+  const insertedArticle = document.getElementById('anchor_insertion6ter');
+  insertedArticle.querySelector('button').click();
+  await waitFor(() => !insertedArticle.querySelector('input').disabled);
+  check('Inserted articles omitted by the modification sheet load their pre-insertion archive', insertedArticle.querySelector('input').max === '1' && insertedArticle.querySelector('.article-history-date').textContent === '01/01/2002' && requested.at(-1) === '018');
+  insertedArticle.querySelector('input').value = 0; insertedArticle.querySelector('input').dispatchEvent(new Event('input'));
+  check('Pre-insertion absence is explicit and links to the archive', insertedArticle.querySelector('.article-history-body').textContent.includes('not present') && insertedArticle.querySelector('.article-history-status a').href === insertionURL);
+  window.historyDone = true;
+} catch (error) { window.historyError = error.stack; console.error(error); }
+console.log(JSON.stringify(checks));
+</script>
+</body>
+</html>
