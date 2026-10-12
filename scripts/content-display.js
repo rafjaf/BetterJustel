@@ -104,7 +104,7 @@ window.BJ.displayModule = function(ctx) {
 		});
 	}
 
-	function enhanceInfoPanel() {
+	function enhanceInfoPanel(online) {
 		const info = document.querySelector("div#info");
 		if (!info) { return; }
 		info.classList.add("act-header");
@@ -117,7 +117,14 @@ window.BJ.displayModule = function(ctx) {
 		brand.rel = "noopener noreferrer";
 		brand.textContent = "Better Justel";
 		brand.title = "Enhanced by Better Justel";
-		info.prepend(brand);
+		const captions = document.createElement("div");
+		captions.className = "act-header__captions";
+		const status = document.createElement("span");
+		status.id = "act-load-status";
+		status.className = `act-header__caption ${Boolean(online)}`;
+		status.textContent = online ? "Act loaded from Justel" : "Act restored";
+		captions.append(status, brand);
+		info.prepend(captions);
 
 		const heading = info.querySelector("p.list-item--title");
 		const title = heading?.querySelector(":scope > span.title");
@@ -334,7 +341,7 @@ window.BJ.displayModule = function(ctx) {
 		$("div#info").append(ctx.act.info);
 		normalizeJustelLinks(document.querySelector("div#info"));
 		setupCopyEli();
-		enhanceInfoPanel();
+		enhanceInfoPanel(online);
 		$("div#info a#btnSavePDF").on("click", function (event, date) {
 			let a = document.createElement("a");
 			a.style = "display: none";
@@ -347,9 +354,23 @@ window.BJ.displayModule = function(ctx) {
 		// Build before the TOC so repaired cached article titles also appear there.
 		let content = ctx.buildContent(ctx.act.content);
 		// Add JSTree
-		$("div#toc").append("<div id='btndiv'><button id='btnCollapse'>Collapse</button><button id='btnExpand'>Expand</button>"
-							+ "<form id='article-jump'><div class='article-input'><input id='article-number' aria-label='Article' placeholder='Article' required><button id='clear-article' type='button' aria-label='Clear article' title='Clear article' hidden>×</button></div><button type='submit'>Jump</button></form></div>"
-							+ `<div id="act-load-status" class="${online}">${online ? "Act loaded from Justel" : "Act restored"}</div>`);
+		const icon = paths => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>`;
+		$("div#toc").append(`<div id="btndiv" role="group" aria-label="Table of contents controls">
+			<button id="btnCollapse" type="button" aria-label="Collapse all" title="Collapse all">${icon('<path d="m7 4 5 5 5-5M7 20l5-5 5 5M4 12h16"/>')}</button>
+			<button id="btnExpand" type="button" aria-label="Expand all" title="Expand all">${icon('<path d="m7 8 5-5 5 5M7 16l5 5 5-5M4 12h16"/>')}</button>
+			<button id="btnAutoscroll" type="button" aria-label="Autoscroll" aria-pressed="false" title="Enable autoscroll: follow the text in the table of contents">${icon('<path d="M4 4h7M4 8h7M4 12h7M4 16h7M4 20h7M18 3v18m-3-3 3 3 3-3m-6-12 3-3 3 3"/>')}</button>
+			<button id="btnJump" type="button" aria-label="Jump to article" title="Jump to article">${icon('<path d="M4 5h6M4 9h6M4 13h6M4 17h6M14 5h6v14m-4-4 4 4 4-4"/>')}</button>
+		</div>`);
+		$("body").append(`<dialog id="article-jump-dialog" aria-labelledby="article-jump-title" aria-describedby="article-jump-help">
+			<form id="article-jump" novalidate>
+				<h2 id="article-jump-title">Jump to article</h2>
+				<p id="article-jump-help">Enter an article number, such as 23, 6ter or XV.125/5.</p>
+				<label for="article-number">Article number</label>
+				<input id="article-number" name="article" autocomplete="off" aria-describedby="article-jump-error" autofocus>
+				<p id="article-jump-error" aria-live="polite"></p>
+				<div class="article-jump-actions"><button id="article-jump-cancel" type="button">Cancel</button><button type="submit">Jump</button></div>
+			</form>
+		</dialog>`);
 		const articles = new Map();
 		function articleNumber(text) {
 			return text.trim().replace(/^Art(?:\.|icle)?\s*/i, "").replace(/\.+$/, "").toLowerCase();
@@ -366,37 +387,51 @@ window.BJ.displayModule = function(ctx) {
 			}
 		}
 		indexArticles(ctx.act.content);
+		const jumpDialog = document.getElementById("article-jump-dialog");
 		const articleInput = document.getElementById("article-number");
-		const clearArticle = document.getElementById("clear-article");
+		const jumpError = document.getElementById("article-jump-error");
 		articleInput.addEventListener("input", function() {
-			articleInput.setCustomValidity("");
-			clearArticle.hidden = !articleInput.value;
+			jumpError.textContent = "";
+			articleInput.removeAttribute("aria-invalid");
 		});
-		clearArticle.addEventListener("click", function() {
-			articleInput.value = "";
+		document.getElementById("btnJump").addEventListener("click", function() {
 			articleInput.dispatchEvent(new Event("input"));
+			jumpDialog.showModal();
 			articleInput.focus();
+			articleInput.select();
 		});
+		document.getElementById("article-jump-cancel").addEventListener("click", () => jumpDialog.close());
+		jumpDialog.addEventListener("close", () => document.getElementById("btnJump").focus({preventScroll: true}));
+		function revealTocNode(id, center = false) {
+			const tree = $("div#jstree").jstree(true);
+			const node = tree.get_node(id);
+			tree.open_node(node.parents.filter(parent => parent !== "#"), false, 0);
+			const toc = document.getElementById("toc");
+			const anchor = document.getElementById(id + "_anchor");
+			const bounds = toc.getBoundingClientRect();
+			const row = anchor.getBoundingClientRect();
+			const toolbarHeight = document.getElementById("btndiv").offsetHeight;
+			if (center || row.top < bounds.top + toolbarHeight || row.bottom > bounds.top + toc.clientHeight) {
+				toc.scrollTop += row.top - bounds.top - toolbarHeight
+					- (toc.clientHeight - toolbarHeight - row.height) / 2;
+			}
+		}
 		document.getElementById("article-jump").addEventListener("submit", function(event) {
 			event.preventDefault();
 			const id = articles.get(articleNumber(articleInput.value));
 			if (!id) {
-				articleInput.setCustomValidity("This article was not found in this act.");
-				articleInput.reportValidity();
+				jumpError.textContent = articleInput.value.trim() ? "This article was not found in this act." : "Enter an article number.";
+				articleInput.setAttribute("aria-invalid", "true");
+				articleInput.focus();
 				return;
 			}
+			jumpDialog.close();
 			const tree = $("div#jstree").jstree(true);
 			const node = tree.get_node(id);
 			tree.open_node(node.parents.filter(parent => parent !== "#"), false, 0);
 			tree.deselect_all(true);
 			tree.select_node(id);
-			requestAnimationFrame(() => {
-				const toc = document.getElementById("toc");
-				const anchor = document.getElementById(id + "_anchor");
-				const toolbarHeight = document.getElementById("btndiv").offsetHeight;
-				toc.scrollTop += anchor.getBoundingClientRect().top - toc.getBoundingClientRect().top
-					- toolbarHeight - (toc.clientHeight - toolbarHeight) / 2;
-			});
+			requestAnimationFrame(() => revealTocNode(id, true));
 		});
 		$("button#btnCollapse").on("click", function (event, data) {
 			$("div#jstree").jstree("close_all")
@@ -404,6 +439,7 @@ window.BJ.displayModule = function(ctx) {
 		$("button#btnExpand").on("click", function (event, data) {
 			$("div#jstree").jstree("open_all")
 		});
+		let followingText = false;
 		let el = document.createElement("div");
 		el.id = "jstree";
 		el.style.display = "none";
@@ -428,6 +464,7 @@ window.BJ.displayModule = function(ctx) {
 				await ctx.loadAndDisplayCaseLaw();
 			})
 			.on("select_node.jstree", function(event, data) {
+				if (followingText) { return; }
 				$("div#anchor_" + data.node.id)[0].scrollIntoView( true );
 			});
 		el.style.display = "";
@@ -437,6 +474,52 @@ window.BJ.displayModule = function(ctx) {
 		// Resolve modifying-law links in cached article HTML as well as header links.
 		normalizeJustelLinks(document.querySelector("div#content"));
 		$("div#content").append("<br><br>");
+		const textPane = document.getElementById("content");
+		const textAnchors = Array.from(textPane.querySelectorAll('div[id^="anchor_"]'));
+		const autoscrollButton = document.getElementById("btnAutoscroll");
+		let autoscroll = (await ctx.getStorage("tocAutoscroll")) === true;
+		let scrollFrame = null;
+		function updateAutoscrollButton() {
+			autoscrollButton.setAttribute("aria-pressed", String(autoscroll));
+			autoscrollButton.title = `${autoscroll ? "Disable" : "Enable"} autoscroll: follow the text in the table of contents`;
+		}
+		updateAutoscrollButton();
+		function followText() {
+			scrollFrame = null;
+			if (!autoscroll || !textAnchors.length) { return; }
+			const top = textPane.getBoundingClientRect().top + 1;
+			// Anchors occur in document order; binary search also handles long acts
+			// without measuring every article on each scroll frame.
+			let low = 0, high = textAnchors.length;
+			while (low < high) {
+				const mid = Math.floor((low + high) / 2);
+				if (textAnchors[mid].getBoundingClientRect().top <= top) { low = mid + 1; }
+				else { high = mid; }
+			}
+			const id = textAnchors[Math.max(0, low - 1)].id.slice(7);
+			const tree = $("div#jstree").jstree(true);
+			if (!tree?.get_node(id)) { return; }
+			// jsTree's suppress_event argument only suppresses "changed", not
+			// "select_node". Guard our navigation handler while following text.
+			followingText = true;
+			try {
+				revealTocNode(id);
+				if (!tree.is_selected(id)) {
+					tree.deselect_all(true);
+					tree.select_node(id, true);
+				}
+			}
+			finally { followingText = false; }
+		}
+		textPane.addEventListener("scroll", function() {
+			if (autoscroll && scrollFrame === null) { scrollFrame = requestAnimationFrame(followText); }
+		}, {passive: true});
+		autoscrollButton.addEventListener("click", function() {
+			autoscroll = !autoscroll;
+			updateAutoscrollButton();
+			ctx.setStorage("tocAutoscroll", autoscroll);
+			if (autoscroll) { followText(); }
+		});
 		ctx.setupArticleHistory?.();
 		// Button to clear DB
 		$("a#clearDB").on("click", async function() {

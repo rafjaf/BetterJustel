@@ -189,10 +189,16 @@ div#info {
 	font-size: 1rem;
 }
 
-div#info .act-header__brand {
-	position: absolute;
-	top: 12px;
-	right: 240px;
+div#info .act-header__captions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+div#info .act-header__brand,
+div#info .act-header__caption {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
@@ -208,6 +214,14 @@ div#info .act-header__brand {
 	text-transform: uppercase;
 }
 
+div#info #act-load-status.true {
+	color: red;
+}
+
+div#info #act-load-status.false {
+	color: blue;
+}
+
 div#info .act-header__brand::before {
 	width: 6px;
 	height: 6px;
@@ -218,7 +232,6 @@ div#info .act-header__brand::before {
 
 div#info p.act-header__heading {
 	margin: 0 0 10px;
-	padding-right: 126px;
 	line-height: 1.3;
 }
 
@@ -421,10 +434,6 @@ div#info a {
 		padding-right: 14px;
 	}
 
-	div#info .act-header__brand {
-		right: 14px;
-	}
-
 	div#info div.act-header__metadata {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
@@ -462,50 +471,134 @@ div#toc div#btndiv {
 	background: white;
 	border-bottom: 1px solid #dce3ea;
 }
-div#toc button {
-	border-radius: 8px;
-	background-color: lightgrey;
-	padding: 5px;
-}
-div#toc form#article-jump {
-	display: flex;
+body.better-justel #btndiv button {
+	display: inline-flex;
 	align-items: center;
-	gap: 8px;
-	margin: 0;
-}
-div#toc input#article-number {
-	width: 105px;
-	padding: 5px 25px 5px 5px;
-	border: 1px solid #647283;
-	border-radius: 4px;
-	font: inherit;
-}
-div#toc .article-input {
-	position: relative;
-}
-div#toc button#clear-article {
-	position: absolute;
-	right: 3px;
-	top: 50%;
-	transform: translateY(-50%);
-	padding: 0 4px;
-	background: transparent;
-	font-size: 20px;
-	line-height: 1;
-}
-div#toc button#clear-article[hidden] {
-	display: none;
-}
-div#toc div#act-load-status {
-	padding: 8px 15px;
-	font-weight: bold;
-}
-div#toc div#act-load-status.true {
-	color: red; 
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border: 1px solid #ced8e1;
+	border-radius: 6px;
+	background: #f1f5f8;
+	color: #33485b;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-div#toc div#act-load-status.false {
-	color: blue; 
+body.better-justel #btndiv button:hover {
+	background: #e8eef3;
+	border-color: #aebdca;
+}
+
+body.better-justel #btndiv #btnAutoscroll[aria-pressed="false"] {
+	color: #647283;
+}
+
+body.better-justel #btndiv #btnAutoscroll[aria-pressed="true"] {
+	background: #315b78;
+	border-color: #315b78;
+	color: white;
+}
+
+#btndiv svg {
+	width: 22px;
+	height: 22px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+body.better-justel #btndiv button:focus-visible,
+body.better-justel #article-jump-dialog button:focus-visible {
+	outline: 2px solid #7da7c3;
+	outline-offset: 2px;
+}
+
+#article-jump-dialog {
+	width: min(400px, calc(100vw - 32px));
+	max-height: calc(100vh - 32px);
+	padding: 24px;
+	border: 1px solid #dce3ea;
+	border-radius: 12px;
+	background: white;
+	color: #17212b;
+	box-shadow: 0 12px 36px rgba(15, 23, 42, 0.2);
+}
+
+#article-jump-dialog::backdrop {
+	background: rgba(23, 33, 43, 0.35);
+}
+
+#article-jump-dialog h2 {
+	font-size: 1.1rem;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+body.better-justel #article-jump-help {
+	margin: 10px 0 20px;
+	color: #647283;
+	font-size: 0.85rem;
+	line-height: 1.5;
+}
+
+#article-jump-dialog label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 0.8rem;
+	font-weight: 600;
+}
+
+#article-jump-dialog input {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid #aebdca;
+	border-radius: 6px;
+	font: inherit;
+}
+
+#article-jump-dialog input:focus {
+	outline: 2px solid #315b78;
+	outline-offset: -1px;
+}
+
+#article-jump-dialog input[aria-invalid="true"] {
+	border-color: #a92a2a;
+}
+
+body.better-justel #article-jump-error {
+	min-height: 1.5em;
+	margin: 6px 0 16px;
+	color: #a92a2a;
+	font-size: 0.8rem;
+}
+
+.article-jump-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+body.better-justel #article-jump-dialog button {
+	padding: 8px 14px;
+	border-radius: 6px;
+	color: #315b78;
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+
+body.better-justel #article-jump-dialog button:hover {
+	background: #e8eef3;
+}
+
+body.better-justel #article-jump-dialog button[type="submit"] {
+	background: #315b78;
+	color: white;
+}
+
+body.better-justel #article-jump-dialog button[type="submit"]:hover {
+	background: #24475f;
 }
 
 div#vsplit {
