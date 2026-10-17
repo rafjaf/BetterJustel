@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Justel bookmark checks</title>
+  <link rel="stylesheet" href="../css/jstree.css">
+  <link rel="stylesheet" href="../css/mycss.css">
+  <script src="../scripts/lib/jquery.min.js"></script>
+  <script src="../scripts/lib/jquery-resizable.min.js"></script>
+  <script src="../scripts/lib/jstree.min.js"></script>
+  <script src="../scripts/content-helpers.js"></script>
+  <script src="../scripts/content-analyse.js"></script>
+  <script src="../scripts/content-highlights.js"></script>
+  <script src="../scripts/content-display.js"></script>
+</head>
+<body>
+<script>
+// Serve the repository locally and open this page; no extension is required.
+(async function() {
+  const checks = window.bookmarkChecks = [];
+  const check = (name, passed) => checks.push({name, passed: Boolean(passed)});
+  const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+  async function settle() { await frame(); await frame(); await frame(); }
+  window.chrome = {runtime: {getManifest: () => ({version: "0.6.2"})}};
+  const eli = "https://www.ejustice.just.fgov.be/eli/loi/1967/10/10/1967101052/justel";
+  const stored = {["highlights-" + eli]: {bookmarks: {"Art. 2.": true, "Art. 70.": true}}};
+  const articles = Array.from({length: 80}, (_, i) => ({
+    id: "bookmark_article_" + (i + 1), type: "article", level: "article", text: "Art. " + (i + 1) + ".",
+    content: "<div style='min-height:100px'><b>Art. " + (i + 1) + ".</b> Texte du paragraphe.</div>"
+  }));
+  const ctx = {
+    act: {eli, fullTitle: "Bookmark checks", info: '<p class="list-item--title"><span class="title">Une loi pour vérifier les signets</span> Note sur la loi.</p>',
+      content: [{id: "chapter", type: "chapitre", level: "level1", text: "CHAPITRE I.", content: "CHAPITRE I.", children: articles}]},
+    HEADINGS_TYPE: ["chapitre"], headingsWhoseTypeNeedsToBeDefined: [],
+    getStorage: async key => structuredClone(stored[key]),
+    setStorage: async (key, value) => { stored[key] = structuredClone(value); },
+    findObjectById: BJ.helpersModule().findObjectById,
+    addLoading() {}, showStatusMessage() {}, loadAndDisplayCaseLaw: async () => {}, runDropboxBackup: async () => {}
+  };
+  Object.assign(ctx, BJ.highlightsModule(ctx), {buildContent: BJ.analyseModule(ctx).buildContent});
+  try {
+    const display = BJ.displayModule(ctx);
+    await display.displayContent(true);
+    await settle();
+    const toc = document.getElementById("toc");
+    const tree = $("#jstree").jstree(true);
+    const star = document.getElementById("btnBookmarks");
+    const bookmarks = document.getElementById("bookmarks");
+    const link = number => document.querySelector('.bookmark-link[data-node-id="bookmark_article_' + number + '"]');
+    const remove = number => document.querySelector('.bookmark-remove[data-node-id="bookmark_article_' + number + '"]');
+    const article = number => document.getElementById("anchor_bookmark_article_" + number);
+    check("Saved bookmarks restore in document order, including IDs with underscores", Array.from(document.querySelectorAll(".bookmark-link")).map(b => b.textContent).join(",") === "Art. 2.,Art. 70.");
+    check("TOC is the default view", bookmarks.hidden && !document.getElementById("jstree").hidden && star.getAttribute("aria-pressed") === "false");
+    check("No floating dropdown or reserved header space remains", !document.getElementById("bookmark-bar") && getComputedStyle(document.getElementById("info")).paddingRight === "14px");
+    const heading = document.querySelector(".act-header__heading").getBoundingClientRect();
+    const captions = document.querySelector(".act-header__captions").getBoundingClientRect();
+    check("Title and badges share the first header row at desktop width", Math.abs(heading.top - captions.top) < 3 && captions.left >= heading.right);
+    toc.scrollTop = 500;
+    const tocPosition = toc.scrollTop;
+    star.click();
+    check("Star replaces the TOC with bookmarks and disables tree controls", document.getElementById("jstree").hidden && !bookmarks.hidden && star.getAttribute("aria-pressed") === "true" && document.getElementById("btnCollapse").disabled && document.getElementById("btnExpand").disabled);
+    tree.close_all();
+    link(70).querySelector("span").click();
+    await settle();
+    check("Bookmark navigation keeps bookmarks visible and selects the article", !bookmarks.hidden && tree.get_selected()[0] === "bookmark_article_70" && link(70).getAttribute("aria-current") === "true");
+    check("Bookmark navigation scrolls the text and expands all TOC ancestors", tree.is_open("chapter") && Math.abs(article(70).getBoundingClientRect().top - document.getElementById("content").getBoundingClientRect().top) < 2);
+    star.click();
+    check("Switching back restores the TOC position and controls", toc.scrollTop === tocPosition && !document.getElementById("btnExpand").disabled);
+    star.click();
+    article(3).querySelector(".bookmark").dispatchEvent(new MouseEvent("mouseup", {bubbles: true}));
+    await settle();
+    check("Article stars add bookmarks to the visible list and storage", link(3) && stored["highlights-" + eli].bookmarks["Art. 3."]);
+    remove(3).click();
+    await settle();
+    check("List stars remove bookmarks from the article and storage", !link(3) && !article(3).classList.contains("bookmark") && !stored["highlights-" + eli].bookmarks["Art. 3."]);
+    const autoscroll = document.getElementById("btnAutoscroll");
+    autoscroll.click();
+    article(2).scrollIntoView(true);
+    await settle();
+    check("Autoscroll updates the bookmarked selection without revealing the TOC", !bookmarks.hidden && document.getElementById("jstree").hidden && link(2).getAttribute("aria-current") === "true");
+    autoscroll.click();
+    document.getElementById("btnJump").click();
+    document.getElementById("article-number").value = "70";
+    document.getElementById("article-jump").requestSubmit();
+    await settle();
+    check("Jump returns to the TOC and reveals the requested article", bookmarks.hidden && star.getAttribute("aria-pressed") === "false" && tree.get_selected()[0] === "bookmark_article_70" && document.getElementById("bookmark_article_70_anchor").getBoundingClientRect().top >= document.getElementById("btndiv").getBoundingClientRect().bottom);
+    star.click();
+    remove(2).click(); remove(70).click();
+    await settle();
+    check("Removing the last bookmark shows an empty state and retains keyboard focus", !bookmarks.hidden && !document.getElementById("bookmarks-empty").hidden && !document.querySelector(".bookmark-link") && document.activeElement === star);
+    article(2).querySelector(".bookmark").dispatchEvent(new MouseEvent("mouseup", {bubbles: true}));
+    await settle();
+    await display.displayContent(false);
+    await settle();
+    check("Bookmarks survive a reload through the offline display path", link(2) && document.getElementById("act-load-status").textContent === "Act restored");
+    stored["highlights-" + eli].bookmarks = Object.fromEntries(articles.map(a => [a.text, true]));
+    await display.displayContent(false);
+    await settle();
+    const longToc = document.getElementById("toc");
+    const longStar = document.getElementById("btnBookmarks");
+    longToc.scrollTop = 600;
+    longStar.click();
+    longToc.scrollTop = 450;
+    longStar.click();
+    const restoredTocPosition = longToc.scrollTop;
+    longStar.click();
+    check("Long bookmark lists and the TOC retain separate scroll positions", restoredTocPosition === 600 && longToc.scrollTop === 450);
+    remove(20).click();
+    await settle();
+    check("Removing from a long list preserves its scroll position and sticky toolbar", longToc.scrollTop === 450 && Math.abs(document.getElementById("btndiv").getBoundingClientRect().top - longToc.getBoundingClientRect().top) < 1);
+    window.bookmarkDone = true;
+    console.log(JSON.stringify(checks));
+  } catch (error) {
+    window.bookmarkError = error.stack;
+    console.error(error);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,1 @@
 .playwright-mcp/
-tests/*
-!tests/history.html
-!tests/fixtures/
-tests/fixtures/*
-!tests/fixtures/history-data.js

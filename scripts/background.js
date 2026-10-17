@@ -14,6 +14,7 @@ function cacheKeyForUrl(rawUrl) {
 			return null;
 		}
 		if (url.pathname.startsWith("/eli/") && url.pathname !== "/eli/") {
+			if (/\/moniteur\/?$/.test(url.pathname)) { return null; }
 			return url.origin + url.pathname;
 		}
 		if (/^\/cgi_[^/]+\/article\.pl$/.test(url.pathname)) {

@@ -179,7 +179,7 @@ div#info {
 	--bj-muted: #647283;
 	position: relative;
 	flex: 0 0 auto;
-	padding: 12px 240px 12px 14px;
+	padding: 12px 14px;
 	width: 100%;
 	height: 230px;
 	margin: 0;
@@ -189,12 +189,21 @@ div#info {
 	font-size: 1rem;
 }
 
+div#info .act-header__top {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 8px 16px;
+	margin-bottom: 10px;
+}
+
 div#info .act-header__captions {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: flex-end;
 	gap: 8px;
-	margin-bottom: 10px;
+	margin-left: auto;
+	padding-top: 2px;
 }
 
 div#info .act-header__brand,
@@ -231,7 +240,9 @@ div#info .act-header__brand::before {
 }
 
 div#info p.act-header__heading {
-	margin: 0 0 10px;
+	flex: 1 1 420px;
+	min-width: 0;
+	margin: 0;
 	line-height: 1.3;
 }
 
@@ -493,10 +504,21 @@ body.better-justel #btndiv #btnAutoscroll[aria-pressed="false"] {
 	color: #647283;
 }
 
-body.better-justel #btndiv #btnAutoscroll[aria-pressed="true"] {
+body.better-justel #btndiv button[aria-pressed="true"] {
 	background: #315b78;
 	border-color: #315b78;
 	color: white;
+}
+
+body.better-justel #btndiv button:disabled {
+	opacity: 0.4;
+	cursor: default;
+	background: #f1f5f8;
+	border-color: #ced8e1;
+}
+
+#btnBookmarks[aria-pressed="true"] svg {
+	fill: currentColor;
 }
 
 #btndiv svg {
@@ -775,6 +797,7 @@ span.subpar {
 	margin-top: 0;
 	font-size: x-small;
 	visibility: hidden;
+	user-select: none;
 }
 
 div.article:hover span.subpar {
@@ -840,50 +863,75 @@ div.status-item a {
 	color: yellow;
 }
 
-div#bookmark-bar {
+#bookmarks[hidden], #jstree[hidden], #bookmarks-empty[hidden] {
 	display: none;
-	position: absolute;
-	top: 10px;
-	right: 15px;
-	width: 200px;
-	background-color: cornflowerblue;
-	padding: 5px;
-	overflow: auto;
-	max-height: 300px;
-	/* font-size: 0.8rem; */
-}
-div#bookmark-bar div#minmax {
-	float: right;
-	cursor: pointer;
-	position: relative;
-	top: 8px;
-	right: 8px;
-}
-div#bookmark-bar div#title {
-	background-color: #e2e2e2;
-	color: #333;
-	font-weight: bold;
-	padding: 8px;
-	cursor: grab;
 }
 
-div#bookmark-bar div#items div {
-	padding-left: 3px;
-	padding-top: 1px;
-    margin: 4px 0;
-    background-color: #FFFFFF;
-    border-radius: 4px;
-    cursor: pointer;
-    height: 17px;
-    line-height: 17px;
-    overflow-y: hidden;
+#bookmark-list {
+	list-style: none;
+	margin: 0;
+	padding: 6px 15px;
 }
 
+#bookmark-list li {
+	display: flex;
+	align-items: center;
+	min-height: 24px;
+	gap: 4px;
+}
 
-div#bookmark-bar div#items div span.bookmark::before {
-	content: "★";
+body.better-justel #bookmark-list .bookmark-link {
+	display: flex;
+	align-items: center;
+	flex: 1;
+	min-width: 0;
+	padding: 0 4px;
+	border-radius: 2px;
+	line-height: 24px;
+	text-align: left;
+}
+
+.bookmark-link span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bookmark-link svg {
+	flex: 0 0 24px;
+	width: 24px;
+	height: 24px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linejoin: round;
+}
+
+body.better-justel #bookmark-list button:hover {
+	background: #e7f4f9;
+}
+
+body.better-justel #bookmark-list .bookmark-link[aria-current="true"] {
+	background: #beebff;
+	box-shadow: inset 0 0 1px #999;
+}
+
+body.better-justel #bookmark-list .bookmark-remove {
+	flex: 0 0 24px;
+	border-radius: 2px;
 	color: darkorange;
-	margin-right: 5px;
+	line-height: 24px;
+}
+
+#bookmark-list button:focus-visible {
+	outline: 2px solid #7da7c3;
+	outline-offset: -2px;
+}
+
+body.better-justel #bookmarks-empty {
+	margin: 12px 15px;
+	color: #647283;
+	line-height: 1.5;
 }
 
 /* Case law blocks */
@@ -1104,6 +1152,9 @@ body.better-justel .article-history-status a {
 }
 .article-history-body {
 	color: #626970;
+}
+.article-history-open > .article-current-body,
+.article-history-body {
 	border-left: 2px solid #b8c1c6;
 	/* Leave space inside the border for the existing Al. margin labels. */
 	padding-left: 35px;

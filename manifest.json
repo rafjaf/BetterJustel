@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Better Justel",
   "description": "Improves Belgian eJustice Justel website",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "icons": {
     "16": "images/justice_scales_16.png",
     "32": "images/justice_scales_32.png",
@@ -61,6 +61,7 @@
         "https://www.ejustice.just.fgov.be/eli/*",
         "https://www.ejustice.just.fgov.be/loi/loi.htm*"
       ],
+      "exclude_matches": ["https://www.ejustice.just.fgov.be/eli/*/moniteur*"],
       "run_at": "document_start"
     }
   ],

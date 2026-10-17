@@ -6,14 +6,33 @@ window.BJ.displayModule = function(ctx) {
 
 	function handleCopy(event) {
 		const selection = document.getSelection();
-		if (!event.clipboardData || !selection?.toString()) { return; }
+		if (!event.clipboardData || !selection || selection.isCollapsed) { return; }
 		const text = selection.toString();
-		const corrected = literaryApostrophes(text);
-		if (corrected === text) { return; }
 		const container = document.createElement("div");
+		let removedLabels = false;
 		for (let i = 0; i < selection.rangeCount; i++) {
-			container.appendChild(selection.getRangeAt(i).cloneContents());
+			const range = selection.getRangeAt(i);
+			const ancestor = range.commonAncestorContainer;
+			const element = ancestor.nodeType === Node.ELEMENT_NODE ? ancestor : ancestor.parentElement;
+			// A range wholly inside a label clones only its text, without the span.
+			if (element?.closest(".subpar")) { removedLabels = true; continue; }
+			container.appendChild(range.cloneContents());
 		}
+		for (const label of container.querySelectorAll(".subpar")) {
+			label.remove();
+			removedLabels = true;
+		}
+		let plainText = text;
+		if (removedLabels) {
+			// innerText preserves paragraph breaks as the browser renders them.
+			container.style.cssText = "position:fixed;left:-100000px;top:0;pointer-events:none";
+			container.setAttribute("aria-hidden", "true");
+			document.body.appendChild(container);
+			try { plainText = container.innerText; }
+			finally { container.remove(); }
+		}
+		const corrected = literaryApostrophes(plainText);
+		if (!removedLabels && corrected === text) { return; }
 		let previousCharacter = "";
 		function correctFragment(node) {
 			if (node.nodeType === Node.TEXT_NODE) {
@@ -124,12 +143,23 @@ window.BJ.displayModule = function(ctx) {
 		status.className = `act-header__caption ${Boolean(online)}`;
 		status.textContent = online ? "Act loaded from Justel" : "Act restored";
 		captions.append(status, brand);
-		info.prepend(captions);
 
 		const heading = info.querySelector("p.list-item--title");
 		const title = heading?.querySelector(":scope > span.title");
 		if (heading) {
 			heading.classList.add("act-header__heading");
+		}
+		const top = document.createElement("div");
+		top.className = "act-header__top";
+		if (heading) {
+			heading.before(top);
+			top.appendChild(heading);
+		} else {
+			info.prepend(top);
+		}
+		top.appendChild(captions);
+		for (const subtitle of info.querySelectorAll("p.list-item--subtitle")) {
+			if (!subtitle.textContent.trim() && !subtitle.childElementCount) { subtitle.remove(); }
 		}
 		if (heading && title) {
 			title.classList.add("act-header__title");
@@ -253,9 +283,11 @@ window.BJ.displayModule = function(ctx) {
 			}
 			for (let key in ctx.highlights.quotes) {
 				if (key == "bookmarks") {
-					for (let bookmark in ctx.highlights.quotes.bookmarks) {
-						let article = $(`div#toc a:contains("${bookmark}")`)?.[0]?.id;
-						document.querySelector(`div#content div#anchor_${article?.slice(0,9)}`)?.classList?.add("bookmark");
+					const nodes = $("#jstree").jstree(true).get_json("#", {flat: true});
+					for (const node of nodes) {
+						if (node.type === "article" && ctx.highlights.quotes.bookmarks[node.text]) {
+							document.getElementById("anchor_" + node.id)?.classList.add("bookmark");
+						}
 					}
 				}
 				else {
@@ -325,7 +357,6 @@ window.BJ.displayModule = function(ctx) {
 									<div id='vsplit'></div>
 									<div id='content'></div>
 								</div>
-								<div id='bookmark-bar'><div id='minmax'>▼</div><div id='title'>Bookmarks</div><div id='items'></div></div>
 								<div id='status'></div>
 							</div>`);
 		// Set up resizable divs
@@ -353,14 +384,60 @@ window.BJ.displayModule = function(ctx) {
 		});
 		// Build before the TOC so repaired cached article titles also appear there.
 		let content = ctx.buildContent(ctx.act.content);
+		const navigationKey = "navigation-" + ctx.act.eli;
+		const savedNavigation = await ctx.getStorage(navigationKey);
 		// Add JSTree
 		const icon = paths => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>`;
-		$("div#toc").append(`<div id="btndiv" role="group" aria-label="Table of contents controls">
+		$("div#toc").append(`<div id="btndiv" role="group" aria-label="Navigation controls">
 			<button id="btnCollapse" type="button" aria-label="Collapse all" title="Collapse all">${icon('<path d="m7 4 5 5 5-5M7 20l5-5 5 5M4 12h16"/>')}</button>
 			<button id="btnExpand" type="button" aria-label="Expand all" title="Expand all">${icon('<path d="m7 8 5-5 5 5M7 16l5 5 5-5M4 12h16"/>')}</button>
 			<button id="btnAutoscroll" type="button" aria-label="Autoscroll" aria-pressed="false" title="Enable autoscroll: follow the text in the table of contents">${icon('<path d="M4 4h7M4 8h7M4 12h7M4 16h7M4 20h7M18 3v18m-3-3 3 3 3-3m-6-12 3-3 3 3"/>')}</button>
+			<button id="btnPrevious" type="button" aria-label="Previous" title="Previous article in navigation history" disabled>${icon('<path d="m15 5-7 7 7 7"/>')}</button>
+			<button id="btnNext" type="button" aria-label="Next" title="Next article in navigation history" disabled>${icon('<path d="m9 5 7 7-7 7"/>')}</button>
 			<button id="btnJump" type="button" aria-label="Jump to article" title="Jump to article">${icon('<path d="M4 5h6M4 9h6M4 13h6M4 17h6M14 5h6v14m-4-4 4 4 4-4"/>')}</button>
+			<button id="btnBookmarks" type="button" aria-label="Bookmarks" aria-pressed="false" aria-controls="bookmarks jstree" title="Show bookmarks">${icon('<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/>')}</button>
 		</div>`);
+		$("div#toc").append(`<nav id="bookmarks" aria-label="Bookmarked articles" hidden>
+			<ul id="bookmark-list"></ul>
+			<p id="bookmarks-empty" role="status">No bookmarks yet. Click the star beside an article to add it here.</p>
+		</nav>`);
+		const tocPane = document.getElementById("toc");
+		const bookmarksPane = document.getElementById("bookmarks");
+		const bookmarksButton = document.getElementById("btnBookmarks");
+		let showingBookmarks = false;
+		const paneScroll = {toc: 0, bookmarks: 0};
+		function showBookmarks(show) {
+			if (show === showingBookmarks) { return; }
+			paneScroll[showingBookmarks ? "bookmarks" : "toc"] = tocPane.scrollTop;
+			showingBookmarks = show;
+			bookmarksPane.hidden = !show;
+			document.getElementById("jstree").hidden = show;
+			bookmarksButton.setAttribute("aria-pressed", String(show));
+			bookmarksButton.title = show ? "Show table of contents" : "Show bookmarks";
+			for (const id of ["btnCollapse", "btnExpand"]) {
+				document.getElementById(id).disabled = show;
+			}
+			tocPane.scrollTop = paneScroll[show ? "bookmarks" : "toc"];
+		}
+		bookmarksButton.addEventListener("click", () => showBookmarks(!showingBookmarks));
+		bookmarksPane.addEventListener("click", async function(event) {
+			const button = event.target.closest("button[data-node-id]");
+			if (!button) { return; }
+			const id = button.dataset.nodeId;
+			if (button.classList.contains("bookmark-remove")) {
+				const row = button.closest("li");
+				const nextId = (row.nextElementSibling || row.previousElementSibling)?.querySelector("button").dataset.nodeId;
+				document.getElementById("anchor_" + id).classList.remove("bookmark");
+				delete ctx.highlights.quotes.bookmarks[ctx.findObjectById(ctx.act, id).text];
+				ctx.updateBookmarks();
+				const next = Array.from(bookmarksPane.querySelectorAll(".bookmark-remove"))
+					.find(item => item.dataset.nodeId === nextId);
+				(next || bookmarksButton).focus({preventScroll: true});
+				await ctx.setStorage("highlights-" + ctx.act.eli, ctx.highlights.quotes);
+				return;
+			}
+			navigateToArticle(id);
+		});
 		$("body").append(`<dialog id="article-jump-dialog" aria-labelledby="article-jump-title" aria-describedby="article-jump-help">
 			<form id="article-jump" novalidate>
 				<h2 id="article-jump-title">Jump to article</h2>
@@ -372,21 +449,102 @@ window.BJ.displayModule = function(ctx) {
 			</form>
 		</dialog>`);
 		const articles = new Map();
+		const articleKeys = new Map();
+		const articlesByKey = new Map();
+		const firstArticles = new Map();
 		function articleNumber(text) {
 			return text.trim().replace(/^Art(?:\.|icle)?\s*/i, "").replace(/\.+$/, "").toLowerCase();
 		}
-		function indexArticles(nodes) {
+		function indexArticles(nodes, parents = []) {
 			for (const node of nodes) {
 				if (node.type === "article") {
 					const number = node.text.match(/^Art(?:\.|icle)\s*([\w./:-]+)/i)?.[1]?.replace(/\.+$/, "");
 					if (number && !articles.has(articleNumber(number))) {
 						articles.set(articleNumber(number), node.id);
 					}
+					// Article numbers survive regenerated TOC IDs and edited captions.
+					let key = number ? "article:" + articleNumber(number) : "title:" + node.text.trim();
+					if (articlesByKey.has(key)) { key += ":" + JSON.stringify(parents); }
+					articleKeys.set(node.id, key);
+					articlesByKey.set(key, node);
+					firstArticles.set(node.id, node.id);
 				}
-				if (node.children) { indexArticles(node.children); }
+				if (node.children) {
+					indexArticles(node.children, [...parents, node.text]);
+					const first = node.children.map(child => firstArticles.get(child.id)).find(Boolean);
+					if (first && node.type !== "article") { firstArticles.set(node.id, first); }
+				}
 			}
 		}
 		indexArticles(ctx.act.content);
+		const navigationLimit = 30;
+		let visits = [], visitIndex = -1;
+		if (Array.isArray(savedNavigation?.entries)) {
+			const savedIndex = Number.isInteger(savedNavigation.index)
+				? Math.max(0, Math.min(savedNavigation.index, savedNavigation.entries.length - 1))
+				: savedNavigation.entries.length - 1;
+			savedNavigation.entries.forEach((key, i) => {
+				if (!articlesByKey.has(key)) { return; }
+				if (visits.at(-1) !== key) { visits.push(key); }
+				if (i <= savedIndex) { visitIndex = visits.length - 1; }
+			});
+			const removed = Math.max(0, visits.length - navigationLimit);
+			visits = visits.slice(-navigationLimit);
+			visitIndex = visits.length ? Math.max(0, visitIndex - removed) : -1;
+		}
+		const previousButton = document.getElementById("btnPrevious");
+		const nextButton = document.getElementById("btnNext");
+		let navigationReady = false, lastNavigation = null;
+		let navigationSave = Promise.resolve();
+		function updateNavigationButtons() {
+			previousButton.disabled = !navigationReady || visitIndex <= 0;
+			nextButton.disabled = !navigationReady || visitIndex < 0 || visitIndex >= visits.length - 1;
+			previousButton.title = visitIndex > 0 ? "Previous: " + articlesByKey.get(visits[visitIndex - 1]).text : "Previous article in navigation history";
+			nextButton.title = visitIndex >= 0 && visitIndex < visits.length - 1 ? "Next: " + articlesByKey.get(visits[visitIndex + 1]).text : "Next article in navigation history";
+		}
+		function saveNavigation() {
+			updateNavigationButtons();
+			const snapshot = {entries: [...visits], index: visitIndex};
+			// Keep rapid successive clicks from saving an older cursor last.
+			navigationSave = navigationSave.then(() => ctx.setStorage(navigationKey, snapshot))
+				.catch(error => console.warn("[Better Justel] Could not save navigation history:", error));
+		}
+		function recordNavigation(from, to) {
+			const origin = articleKeys.get(from), destination = articleKeys.get(to);
+			if (origin === destination && visits[visitIndex] === destination) { return; }
+			// New visits append to the full history, including entries ahead of the cursor.
+			for (const key of [origin, destination]) {
+				if (key && visits.at(-1) !== key) { visits.push(key); }
+			}
+			visits = visits.slice(-navigationLimit);
+			visitIndex = visits.length - 1;
+			saveNavigation();
+		}
+		function navigateToArticle(nodeId, record = true) {
+			const id = firstArticles.get(nodeId);
+			if (!id) { return; }
+			if (record) {
+				const origin = lastNavigation?.position === textPane.scrollTop
+					? lastNavigation.id : visibleAnchorId(articleAnchors);
+				recordNavigation(origin, id);
+			}
+			const tree = $("#jstree").jstree(true);
+			tree.open_node(tree.get_node(id).parents.filter(parent => parent !== "#"), false, 0);
+			tree.deselect_all(true);
+			tree.select_node(id);
+			document.getElementById("anchor_" + id).scrollIntoView(true);
+			lastNavigation = {id, position: textPane.scrollTop};
+			requestAnimationFrame(() => revealTocNode(id, true));
+		}
+		function stepNavigation(delta) {
+			const index = visitIndex + delta;
+			if (!navigationReady || index < 0 || index >= visits.length) { return; }
+			visitIndex = index;
+			navigateToArticle(articlesByKey.get(visits[index]).id, false);
+			saveNavigation();
+		}
+		previousButton.addEventListener("click", () => stepNavigation(-1));
+		nextButton.addEventListener("click", () => stepNavigation(1));
 		const jumpDialog = document.getElementById("article-jump-dialog");
 		const articleInput = document.getElementById("article-number");
 		const jumpError = document.getElementById("article-jump-error");
@@ -403,6 +561,7 @@ window.BJ.displayModule = function(ctx) {
 		document.getElementById("article-jump-cancel").addEventListener("click", () => jumpDialog.close());
 		jumpDialog.addEventListener("close", () => document.getElementById("btnJump").focus({preventScroll: true}));
 		function revealTocNode(id, center = false) {
+			if (showingBookmarks) { return; }
 			const tree = $("div#jstree").jstree(true);
 			const node = tree.get_node(id);
 			tree.open_node(node.parents.filter(parent => parent !== "#"), false, 0);
@@ -426,12 +585,8 @@ window.BJ.displayModule = function(ctx) {
 				return;
 			}
 			jumpDialog.close();
-			const tree = $("div#jstree").jstree(true);
-			const node = tree.get_node(id);
-			tree.open_node(node.parents.filter(parent => parent !== "#"), false, 0);
-			tree.deselect_all(true);
-			tree.select_node(id);
-			requestAnimationFrame(() => revealTocNode(id, true));
+			showBookmarks(false);
+			navigateToArticle(id);
 		});
 		$("button#btnCollapse").on("click", function (event, data) {
 			$("div#jstree").jstree("close_all")
@@ -439,7 +594,6 @@ window.BJ.displayModule = function(ctx) {
 		$("button#btnExpand").on("click", function (event, data) {
 			$("div#jstree").jstree("open_all")
 		});
-		let followingText = false;
 		let el = document.createElement("div");
 		el.id = "jstree";
 		el.style.display = "none";
@@ -459,13 +613,22 @@ window.BJ.displayModule = function(ctx) {
 			.on("ready.jstree", async function (event, data) {
 				$(this).jstree("open_all");
 				await loadHighlights();
-				ctx.updateBookmarkBar();
+				ctx.updateBookmarks();
+				navigationReady = true;
+				updateNavigationButtons();
+				if (visitIndex >= 0) { navigateToArticle(articlesByKey.get(visits[visitIndex]).id, false); }
 				// Load and display case law after content and highlights are ready
 				await ctx.loadAndDisplayCaseLaw();
 			})
 			.on("select_node.jstree", function(event, data) {
-				if (followingText) { return; }
-				$("div#anchor_" + data.node.id)[0].scrollIntoView( true );
+				for (const link of bookmarksPane.querySelectorAll(".bookmark-link")) {
+					if (link.dataset.nodeId === data.node.id) { link.setAttribute("aria-current", "true"); }
+					else { link.removeAttribute("aria-current"); }
+				}
+			})
+			.on("activate_node.jstree", function(event, data) {
+				// Activation is deliberate; selection alone also happens during autoscroll.
+				navigateToArticle(data.node.id);
 			});
 		el.style.display = "";
 		$("div#toc").append("<br><br>");
@@ -476,6 +639,7 @@ window.BJ.displayModule = function(ctx) {
 		$("div#content").append("<br><br>");
 		const textPane = document.getElementById("content");
 		const textAnchors = Array.from(textPane.querySelectorAll('div[id^="anchor_"]'));
+		const articleAnchors = textAnchors.filter(anchor => articleKeys.has(anchor.id.slice(7)));
 		const autoscrollButton = document.getElementById("btnAutoscroll");
 		let autoscroll = (await ctx.getStorage("tocAutoscroll")) === true;
 		let scrollFrame = null;
@@ -484,32 +648,31 @@ window.BJ.displayModule = function(ctx) {
 			autoscrollButton.title = `${autoscroll ? "Disable" : "Enable"} autoscroll: follow the text in the table of contents`;
 		}
 		updateAutoscrollButton();
-		function followText() {
-			scrollFrame = null;
-			if (!autoscroll || !textAnchors.length) { return; }
+		function visibleAnchorId(anchors) {
+			if (!anchors.length) { return; }
 			const top = textPane.getBoundingClientRect().top + 1;
 			// Anchors occur in document order; binary search also handles long acts
 			// without measuring every article on each scroll frame.
-			let low = 0, high = textAnchors.length;
+			let low = 0, high = anchors.length;
 			while (low < high) {
 				const mid = Math.floor((low + high) / 2);
-				if (textAnchors[mid].getBoundingClientRect().top <= top) { low = mid + 1; }
+				if (anchors[mid].getBoundingClientRect().top <= top) { low = mid + 1; }
 				else { high = mid; }
 			}
-			const id = textAnchors[Math.max(0, low - 1)].id.slice(7);
+			return anchors[Math.max(0, low - 1)].id.slice(7);
+		}
+		function followText() {
+			scrollFrame = null;
+			if (!autoscroll || !textAnchors.length) { return; }
+			const id = visibleAnchorId(textAnchors);
 			const tree = $("div#jstree").jstree(true);
 			if (!tree?.get_node(id)) { return; }
-			// jsTree's suppress_event argument only suppresses "changed", not
-			// "select_node". Guard our navigation handler while following text.
-			followingText = true;
-			try {
-				revealTocNode(id);
-				if (!tree.is_selected(id)) {
-					tree.deselect_all(true);
-					tree.select_node(id, true);
-				}
+			// Selecting a node does not activate it or record a navigation visit.
+			revealTocNode(id);
+			if (!tree.is_selected(id)) {
+				tree.deselect_all(true);
+				tree.select_node(id, true);
 			}
-			finally { followingText = false; }
 		}
 		textPane.addEventListener("scroll", function() {
 			if (autoscroll && scrollFrame === null) { scrollFrame = requestAnimationFrame(followText); }
@@ -535,48 +698,6 @@ window.BJ.displayModule = function(ctx) {
 		});
 		// Change document title
 		document.querySelector("head > title").text = ctx.act.fullTitle;
-		// Set up bookmark bar
-		try { $("div#bookmark-bar").draggable(); } catch(e) { console.warn("draggable not available:", e.message); }
-		$("div#bookmark-bar div#items div").on('mousedown', function(e) {
-			e.stopPropagation(); // Prevents the mousedown event from reaching the parent
-		});
-		$("div#bookmark-bar div#items").click(async function(e){
-			switch(e.target.className) {
-				case "bookmark":
-					// Remove bookmark from this article
-					let currentArticleElem = document.querySelector("div#" + e.target.nextElementSibling.getAttribute("target"));
-					let currentArticle = currentArticleElem.id;
-					// let articleText = $(`div#toc a#${currentArticle.slice(7)}_anchor`).text();
-					let articleText = ctx.findObjectById(ctx.act, currentArticle.slice(7)).text;
-					currentArticleElem.classList.remove("bookmark");
-					delete ctx.highlights.quotes.bookmarks[articleText];
-					await ctx.setStorage("highlights-" + ctx.act.eli, ctx.highlights.quotes);
-					ctx.updateBookmarkBar();
-					break;
-				case "item":
-					$("div#" + e.target.getAttribute("target"))[0].scrollIntoView(true);
-					// Also expand and scroll to the relevant article in the TOC
-					let nodeId = e.target.getAttribute("target").replace("anchor_", "");
-					let jstreeInst = $("div#jstree").jstree(true);
-					if (jstreeInst) {
-						jstreeInst.deselect_all(true);
-						jstreeInst.open_node(jstreeInst.get_parent(nodeId));
-						jstreeInst.select_node(nodeId, true);
-						let tocNode = document.getElementById(nodeId + "_anchor") || document.getElementById(nodeId);
-						if (tocNode) { tocNode.scrollIntoView({block: "center"}); }
-					}
-					break;
-			}
-		})
-		$("div#bookmark-bar div#minmax").click(function() {
-			const div = document.querySelector("div#bookmark-bar div#items");
-			if (div.style.display == "none") {
-				div.style.display = "block";
-			}
-			else {
-				div.style.display = "none";
-			}
-		});
 		// Hide margin annotations (Al., bookmarks) while text is selected
 		document.removeEventListener("copy", handleCopy);
 		document.addEventListener("copy", handleCopy);

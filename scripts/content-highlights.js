@@ -310,7 +310,7 @@ window.BJ.highlightsModule = function(ctx) {
 					ctx.highlights.quotes.bookmarks[articleText] = true;
 					await ctx.setStorage("highlights-" + ctx.act.eli, ctx.highlights.quotes);
 				}
-				updateBookmarkBar();
+				updateBookmarks();
 			}
 			else if (!event.target.closest("annotation")) {
 				// else erase highlight selection, hide annotation and toolbar
@@ -357,30 +357,37 @@ window.BJ.highlightsModule = function(ctx) {
 		}
 	}
 
-	function updateBookmarkBar() {
-		const bookmarks = document.querySelectorAll("div.article.bookmark");
-		if (!bookmarks.length) {
-			document.querySelector("div#bookmark-bar").style.display = "none";
-			return
-		}
-		document.querySelector("div#bookmark-bar").style.display = "block";
-		const items = document.querySelector("div#bookmark-bar div#items");
+	function updateBookmarks() {
+		const bookmarks = document.querySelectorAll("#content div.article.bookmark");
+		const items = document.getElementById("bookmark-list");
+		const selected = $("#jstree").jstree(true).get_selected()[0];
 		items.replaceChildren();
+		document.getElementById("bookmarks-empty").hidden = bookmarks.length > 0;
 		for (const b of bookmarks) {
-			const node = b.id.split("_")[1];
-			// const title = document.querySelector("li#" + node).textContent;
+			const node = b.id.slice(7);
 			const title = ctx.findObjectById(ctx.act, node).text;
-			const item = document.createElement("div");
-			const bookmark = document.createElement("span");
-			bookmark.className = "bookmark";
+			const item = document.createElement("li");
+			const link = document.createElement("button");
+			link.type = "button";
+			link.className = "bookmark-link";
+			link.dataset.nodeId = node;
+			link.title = title;
+			if (selected === node) { link.setAttribute("aria-current", "true"); }
+			link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3H6v18h12V7l-4-4Zm0 0v5h4M9 12h6M9 16h6"/></svg>';
 			const label = document.createElement("span");
-			label.className = "item";
-			label.setAttribute("target", b.id);
 			label.textContent = title;
-			item.append(bookmark, label);
+			link.appendChild(label);
+			const remove = document.createElement("button");
+			remove.type = "button";
+			remove.className = "bookmark-remove";
+			remove.dataset.nodeId = node;
+			remove.title = `Remove bookmark: ${title}`;
+			remove.setAttribute("aria-label", remove.title);
+			remove.textContent = "★";
+			item.append(link, remove);
 			items.appendChild(item);
 		}
 	}
 
-	return { manageHighlights, updateBookmarkBar };
+	return { manageHighlights, updateBookmarks };
 };

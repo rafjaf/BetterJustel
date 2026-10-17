@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Better Justel navigation checks</title>
+  <link rel="stylesheet" href="../css/jstree.css">
+  <link rel="stylesheet" href="../css/mycss.css">
+  <script src="../scripts/lib/jquery.min.js"></script>
+  <script src="../scripts/lib/jquery-resizable.min.js"></script>
+  <script src="../scripts/lib/jstree.min.js"></script>
+  <script src="../scripts/content-helpers.js"></script>
+  <script src="../scripts/content-analyse.js"></script>
+  <script src="../scripts/content-highlights.js"></script>
+  <script src="../scripts/content-display.js"></script>
+</head>
+<body>
+<script>
+(async function() {
+  const checks = window.navigationChecks = [];
+  function check(name, passed) {
+    checks.push({name, passed: Boolean(passed)});
+    if (!passed) { throw new Error(name); }
+  }
+  const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+  async function settle() { await frame(); await frame(); await frame(); }
+  async function waitFor(predicate) {
+    const deadline = Date.now() + 5000;
+    while (!predicate()) {
+      if (Date.now() > deadline) { throw new Error("Timed out waiting for navigation storage"); }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
+  window.chrome = {runtime: {getManifest: () => ({version: "0.6.2"})}};
+  const eli = "https://www.ejustice.just.fgov.be/eli/loi/1967/10/10/1967101052/justel";
+  const key = "navigation-" + eli;
+  const stored = {["highlights-" + eli]: {bookmarks: {"Art. 42.": true}}};
+  const nodes = Array.from({length: 45}, (_, i) => ({
+    id: "nav_" + (i + 1), type: "article", level: "article", text: "Art. " + (i + 1) + ".",
+    content: "<div style='min-height:130px'><b>Art. " + (i + 1) + ".</b> Texte du paragraphe.</div>"
+  }));
+  const ctx = {
+    act: {eli, fullTitle: "Navigation checks", info: "", content: [
+      {id: "chapter1", type: "chapitre", level: "level1", text: "CHAPITRE I.", content: "CHAPITRE I.", children: nodes.slice(0, 20)},
+      {id: "chapter2", type: "chapitre", level: "level1", text: "CHAPITRE II.", content: "CHAPITRE II.", children: [
+        {id: "empty", type: "section", level: "level2", text: "SECTION VIDE.", content: "SECTION VIDE.", children: []},
+        {id: "section2", type: "section", level: "level2", text: "SECTION II.", content: "SECTION II.", children: nodes.slice(20)}
+      ]}
+    ]},
+    HEADINGS_TYPE: ["chapitre", "section"], headingsWhoseTypeNeedsToBeDefined: [],
+    getStorage: async key => structuredClone(stored[key]),
+    setStorage: async (key, value) => {
+      await new Promise(resolve => setTimeout(resolve, 1));
+      stored[key] = structuredClone(value);
+    },
+    findObjectById: BJ.helpersModule().findObjectById,
+    addLoading() {}, showStatusMessage() {}, loadAndDisplayCaseLaw: async () => {}, runDropboxBackup: async () => {}
+  };
+  Object.assign(ctx, BJ.highlightsModule(ctx), {buildContent: BJ.analyseModule(ctx).buildContent});
+  const tree = () => $("#jstree").jstree(true);
+  const previous = () => document.getElementById("btnPrevious");
+  const next = () => document.getElementById("btnNext");
+  const article = number => document.getElementById("anchor_" + nodes[number - 1].id);
+  const clickArticle = number => document.getElementById(nodes[number - 1].id + "_anchor").click();
+  const selected = number => tree().get_selected()[0] === nodes[number - 1].id;
+  const entries = () => stored[key]?.entries.join(",");
+  async function jump(number) {
+    document.getElementById("btnJump").click();
+    document.getElementById("article-number").value = number;
+    document.getElementById("article-jump").requestSubmit();
+    await settle();
+  }
+  try {
+    const display = BJ.displayModule(ctx);
+    await display.displayContent(true);
+    await settle();
+    check("Previous and Next sit between Autoscroll and Jump with matching labelled icons", Array.from(document.querySelectorAll("#btndiv button")).map(b => b.id).join(",") === "btnCollapse,btnExpand,btnAutoscroll,btnPrevious,btnNext,btnJump,btnBookmarks" && previous().querySelector("svg") && next().querySelector("svg"));
+    check("An unvisited text starts with both history controls disabled", previous().disabled && next().disabled && !stored[key]);
+    tree().close_all();
+    document.querySelector("#chapter1 > .jstree-ocl").click();
+    await settle();
+    check("Expanding a folder records no history", tree().is_open("chapter1") && !stored[key]);
+    article(5).scrollIntoView(true);
+    await jump(20);
+    check("Jump records the article being read and the destination even with autoscroll off", entries() === "article:5,article:20" && stored[key].index === 1 && !previous().disabled && next().disabled);
+    previous().click(); await settle();
+    check("Previous returns to the origin without appending visits", selected(5) && stored[key].index === 0 && stored[key].entries.length === 2 && previous().disabled && !next().disabled);
+    next().click(); await settle();
+    check("Next replays the forward destination and advertises it in the tooltip", selected(20) && stored[key].index === 1 && previous().title.includes("Art. 5."));
+    await jump(20);
+    check("Repeating the current destination creates no consecutive duplicate", stored[key].entries.length === 2);
+    article(12).scrollIntoView(true);
+    await jump(25);
+    check("A later jump records a manually scrolled origin only when navigation occurs", entries() === "article:5,article:20,article:12,article:25");
+    tree().open_all(); clickArticle(10); await settle();
+    check("Explicit TOC article clicks record visits", selected(10) && stored[key].entries.at(-1) === "article:10");
+    clickArticle(10); await settle();
+    check("Clicking an already selected TOC article does not duplicate it", stored[key].entries.length === 5);
+    previous().click(); await settle();
+    clickArticle(7); await settle();
+    check("A new destination after Previous preserves the existing forward entries", selected(7) && next().disabled && entries() === "article:5,article:20,article:12,article:25,article:10,article:25,article:7");
+    const retainedEntries = entries();
+    previous().click(); previous().click(); await settle();
+    check("Previous can still reach the formerly forward article", selected(10) && entries() === retainedEntries);
+    next().click(); next().click(); await settle();
+    check("Going forward again retains the entire history", selected(7) && entries() === retainedEntries && next().disabled);
+    document.getElementById("chapter2_anchor").click(); await settle();
+    check("Clicking a folder navigates to its first article through nested and empty sections", selected(21) && stored[key].entries.at(-1) === "article:21");
+    const beforeEmpty = entries();
+    document.getElementById("empty_anchor").click(); await settle();
+    check("An empty folder adds no article to history", entries() === beforeEmpty);
+    const beforeScroll = JSON.stringify(stored[key]);
+    document.getElementById("btnAutoscroll").click();
+    article(33).scrollIntoView(true); await settle();
+    check("Pure autoscroll updates the TOC without changing entries or cursor", selected(33) && JSON.stringify(stored[key]) === beforeScroll);
+    await jump(34);
+    check("A deliberate move after autoscroll captures its current reading origin", stored[key].entries.slice(-2).join(",") === "article:33,article:34");
+    document.getElementById("btnAutoscroll").click();
+    document.getElementById("btnBookmarks").click();
+    document.querySelector(".bookmark-link").click(); await settle();
+    check("Bookmark clicks share the navigation history", selected(42) && stored[key].entries.slice(-2).join(",") === "article:34,article:42" && !document.getElementById("bookmarks").hidden);
+    const bookmarkLength = stored[key].entries.length;
+    previous().click(); await settle();
+    next().click(); await settle();
+    check("History replay preserves bookmark view and adds no new entries", selected(42) && !document.getElementById("bookmarks").hidden && stored[key].entries.length === bookmarkLength);
+    document.querySelector(".bookmark-remove").click(); await settle();
+    check("Removing a bookmark adds no navigation visit", stored[key].entries.length === bookmarkLength);
+    document.getElementById("btnBookmarks").click();
+    tree().open_all();
+    for (let number = 1; number <= 40; number++) { clickArticle(number); }
+    await waitFor(() => stored[key].entries.at(-1) === "article:40");
+    check("Rapid navigation retains only the latest 30 entries and saves the newest cursor last", stored[key].entries.length === 30 && stored[key].entries[0] === "article:11" && stored[key].index === 29);
+    for (let i = 0; i < 35; i++) { previous().click(); }
+    await waitFor(() => stored[key].index === 0);
+    check("Previous stops at the oldest retained article", selected(11) && previous().disabled && !next().disabled && stored[key].entries.length === 30);
+    next().click(); next().click(); next().click();
+    await waitFor(() => stored[key].index === 3);
+    await display.displayContent(false); await settle();
+    check("Reopening the text restores its saved article, cursor and forward branch", selected(14) && !previous().disabled && !next().disabled && stored[key].index === 3);
+    nodes.forEach((node, i) => { node.id = "regenerated_" + i; });
+    await display.displayContent(true); await settle();
+    check("History survives regenerated TOC IDs", selected(14) && stored[key].entries[3] === "article:14");
+    ctx.act.content[0].children = ctx.act.content[0].children.filter(n => n !== nodes[13]);
+    await display.displayContent(false); await settle();
+    check("If the saved article disappears, history restores the closest preceding valid entry", selected(13) && !previous().disabled && !next().disabled);
+    const original = JSON.stringify(stored[key]);
+    ctx.act.eli = eli.replace("1967101052", "1980080801");
+    await display.displayContent(false); await settle();
+    check("Another text has an independent empty history", previous().disabled && next().disabled);
+    await jump(8);
+    check("Saving another text preserves the first text's history", JSON.stringify(stored[key]) === original && stored["navigation-" + ctx.act.eli].entries.at(-1) === "article:8");
+    ctx.act.eli = eli;
+    stored[key] = {entries: ["missing", "article:1", "article:2", "article:2", "deleted"], index: 3};
+    await display.displayContent(false); await settle();
+    check("Restoration skips stale entries and adjacent duplicates while retaining the cursor", selected(2) && !previous().disabled && next().disabled);
+    clickArticle(3); await settle();
+    check("The next save persists the cleaned history", entries() === "article:1,article:2,article:3" && stored[key].index === 2);
+    stored[key] = {entries: "invalid", index: null};
+    await display.displayContent(false); await settle();
+    check("Malformed saved history falls back to disabled controls", previous().disabled && next().disabled);
+    window.navigationDone = true;
+    console.log(JSON.stringify(checks));
+  } catch (error) {
+    window.navigationError = error.stack;
+    console.error(error);
+  }
+})();
+</script>
+</body>
+</html>

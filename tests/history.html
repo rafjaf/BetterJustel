@@ -83,6 +83,11 @@ try {
   await new Promise(resolve => setTimeout(resolve, 250));
   const center = element => { const r = element.getBoundingClientRect(); return r.left + r.width / 2; };
   check('Date is centered between the clock and bookmark', Math.abs(center(date) - (center(clock) + center(article.querySelector('.bookmark'))) / 2) < 1);
+  const currentBody = article.querySelector('.article-current-body');
+  const currentParagraph = document.createElement('div');
+  currentParagraph.innerHTML = '<span class="subpar">Al. 2</span>Latest paragraph.';
+  currentBody.appendChild(currentParagraph);
+  check('Latest text has a divider and keeps paragraph labels to its right in history mode', getComputedStyle(currentBody).borderLeftWidth === '2px' && currentParagraph.querySelector('.subpar').getBoundingClientRect().left > currentBody.getBoundingClientRect().left + 2 && article.querySelector('.bookmark').getBoundingClientRect().right < currentBody.getBoundingClientRect().left);
   const pane = document.getElementById('content'), originalStyle = pane.style.cssText;
   pane.style.cssText = 'height:240px;width:700px;overflow-y:auto';
   const spacer = document.createElement('section'); spacer.style.height = '800px'; article.querySelector('.article-current-body').appendChild(spacer);
@@ -115,6 +120,7 @@ try {
   check('Leaving the slider restores the selected date', date.textContent === '01/11/2015');
   clock.click();
   check('Closing restores the original highlighted DOM', saved === document.getElementById('saved-highlight') && !article.querySelector('.article-current-body').hidden && !article.classList.contains('article-historical'));
+  check('Closing history removes the latest-text divider and its extra indentation', getComputedStyle(currentBody).borderLeftWidth === '0px' && getComputedStyle(currentBody).paddingLeft === '0px');
   clock.click();
   check('Reopening uses in-memory history', requested.length === 3);
   const cachedCount = Object.keys(stored).filter(k => k.startsWith('archive-' + eli + ':')).length;

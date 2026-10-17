@@ -33,8 +33,8 @@
 	const {runDropboxBackup} = BJ.dropboxModule(ctx);
 	Object.assign(ctx, {runDropboxBackup});
 
-	const {updateBookmarkBar, manageHighlights} = BJ.highlightsModule(ctx);
-	Object.assign(ctx, {updateBookmarkBar, manageHighlights});
+	const {updateBookmarks, manageHighlights} = BJ.highlightsModule(ctx);
+	Object.assign(ctx, {updateBookmarks, manageHighlights});
 
 	const {loadAndDisplayCaseLaw, clearCaselawFetchFlag, isInCaselawBlock, saveCaselawHighlight, removeCaselawHighlight, updateCaselawHighlight} = BJ.caselawModule(ctx);
 	Object.assign(ctx, {loadAndDisplayCaseLaw, clearCaselawFetchFlag, isInCaselawBlock, saveCaselawHighlight, removeCaselawHighlight, updateCaselawHighlight});

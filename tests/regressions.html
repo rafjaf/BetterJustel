@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Better Justel regression checks</title>
+  <link rel="stylesheet" href="../css/jstree.css">
+  <link rel="stylesheet" href="../css/mycss.css">
+  <script src="../scripts/lib/jquery.min.js"></script>
+  <script src="../scripts/lib/jquery-ui.min.js"></script>
+  <script src="../scripts/lib/jquery-resizable.min.js"></script>
+  <script src="../scripts/lib/jstree.min.js"></script>
+  <script src="../scripts/lib/standalone-anchoring.js"></script>
+  <script src="../scripts/content-helpers.js"></script>
+  <script src="../scripts/content-analyse.js"></script>
+  <script src="../scripts/content-display.js"></script>
+</head>
+<body>
+<script>
+// Open this file in an ordinary browser; no installed extension is required.
+(async function() {
+  const checks = window.regressionChecks = [];
+  function check(name, passed) { checks.push({name, passed: Boolean(passed)}); }
+  const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+  window.chrome = {runtime: {getManifest: () => ({version: "0.5.2"})}};
+  const paragraph = "Il ne sera procédé à aucune saisie-exécution mobilière ou immobilière qu'en vertu d'un titre exécutoire et pour choses liquides et certaines";
+  const oldTitle = "Art. 1494. " + paragraph;
+  let savedQuotes = {bookmarks: {[oldTitle]: true}, [oldTitle]: [
+    {id: "saved-quote", color: "yellow", exact: "Il ne sera procédé", prefix: "", suffix: ""}
+  ]};
+  const settings = {};
+  const helpers = BJ.helpersModule();
+  const ctx = {
+    HEADINGS_TYPE: ["partie", "livre", "titre", "sous-titre", "chapitre", "section", "sous-section", "paragraphe", "§"],
+    headingsWhoseTypeNeedsToBeDefined: [],
+    act: {eli: "https://www.ejustice.just.fgov.be/eli/loi/1967/10/10/1967101056/justel", fullTitle: "Regression checks", info: "", content: []},
+    addLoading() {}, getStorage: async key => key.startsWith("highlights-") ? savedQuotes : key === "tocAutoscroll" ? settings[key] : "0.5.2",
+    setStorage: async (key, value) => { if (key.startsWith("highlights-")) { savedQuotes = value; } else { settings[key] = value; } },
+    findObjectById: helpers.findObjectById,
+    updateBookmarks() {}, loadAndDisplayCaseLaw: async () => {}, manageHighlights() {},
+    runDropboxBackup: async () => {}, showStatusMessage() {}
+  };
+  try {
+    // Preserve Justel's split anchors and the missing final full stop of Art. 1494.
+    const source = document.createElement("div");
+    source.id = "list-title-3";
+    source.innerHTML = '<h2>Texte</h2><a name="LNK0026">CHAPITRE PREMIER.</a> _ Dispositions générales.<br><br>'
+      + '<a name="Art.1494" href="#Art.1493">Art.</a> <a href="#Art.1495"> 1494</a>. ' + paragraph
+      + '<br>Deuxième paragraphe.<br><br><a name="LNKCAP1">CHAMP D\'APPLICATION.</a><br><br><a name="Art.1495" href="#Art.1494">Art.</a> <a href="#Art.1496"> 1495</a>. Texte du paragraphe.<br><br>'
+      + '<a name="LNKCAP2">Matière visée.</a><br><br><a name="Art.1496" href="#Art.1495">Art.</a> <a href="#Art.1497"> 1496</a>. Texte du paragraphe.<br><br>'
+      + Array.from({length: 40}, (_, i) => '<a name="Art.' + (1500 + i) + '">Art.</a> <a href="#next"> ' + (1500 + i) + '</a>. Ce paragraphe finit par un point.<br><br>').join('');
+    document.body.appendChild(source);
+    const analyse = BJ.analyseModule(ctx);
+    analyse.analyseContent();
+    const article = ctx.act.content[0].children[0];
+    check("Art. 1494 has a short title", article.text === "Art. 1494.");
+    check("Art. 1494 body is not bold", article.content.includes("<b>Art. 1494.</b> " + paragraph));
+    check("Uppercase captions are preserved", ctx.act.content[0].children[1].text.includes("CHAMP D'APPLICATION"));
+    check("Mixed-case captions are preserved", ctx.act.content[0].children[2].text === "Art. 1496. Matière visée" && ctx.act.content[0].children[2].content.includes("<b>Art. 1496. Matière visée</b>"));
+
+    const cachedCaption = {id: "cached-caption", type: "article", level: "article", text: "Art. 2.", content: "<div><b>Art. 2.</b> Objet</div><div>Texte du paragraphe.</div>"};
+    analyse.buildContent([cachedCaption]);
+    check("Mixed-case captions are recovered from saved HTML", cachedCaption.text === "Art. 2. Objet" && cachedCaption.content.includes("<b>Art. 2. Objet</b>"));
+
+    function cachedArticle(number, suffix, explicitTitle = false) {
+      return {id: "pattern" + number, type: "article", level: "article", text: "Art. " + number + ". " + suffix, explicitTitle,
+        content: "<div><b>Art. " + number + ". " + suffix + "</b></div><div>Un autre paragraphe.</div>"};
+    }
+    function formatPattern(nodes) {
+      const patternCtx = {act: {eli: "https://example.invalid/unrelated-act", content: nodes}};
+      BJ.analyseModule(patternCtx).buildContent(nodes);
+      return patternCtx.act.articleTitleStyle;
+    }
+    const ordinary = Array.from({length: 20}, (_, i) => cachedArticle(i + 1, "Un paragraphe complet."));
+    const anomaly = cachedArticle(87, "Un paragraphe auquel manque le point final");
+    check("Anomalies are detected without an act or article identity", formatPattern([...ordinary, anomaly]) === "untitled" && anomaly.text === "Art. 87." && anomaly.content.includes("</b> Un paragraphe"));
+    const captions = Array.from({length: 20}, (_, i) => cachedArticle(i + 1, "Une légende en casse mixte"));
+    check("Acts with consistent mixed-case titles retain them", formatPattern(captions) === "titled" && captions.every(n => n.text.endsWith("Une légende en casse mixte")));
+    const ambiguous = [cachedArticle(1, "Objet"), cachedArticle(2, "Un paragraphe complet.")];
+    check("Short acts keep prior title detection", formatPattern(ambiguous) === "unknown" && ambiguous[0].text === "Art. 1. Objet");
+    const explicit = cachedArticle(88, "Une légende explicite", true);
+    check("Explicit captions survive in mostly untitled acts", formatPattern([...ordinary, explicit]) === "untitled" && explicit.text.endsWith("Une légende explicite"));
+    const mixed = Array.from({length: 20}, (_, i) => cachedArticle(i + 1, i % 2 ? "Un paragraphe complet." : "Une légende"));
+    check("Mixed acts keep prior title detection", formatPattern(mixed) === "unknown" && mixed[0].text.endsWith("Une légende"));
+    const emptyArticles = Array.from({length: 30}, (_, i) => cachedArticle(i + 1, "..."));
+    const isolatedTitle = cachedArticle(77, "Objet");
+    check("Repealed articles do not bias the sample", formatPattern([...emptyArticles, isolatedTitle]) === "unknown" && isolatedTitle.text === "Art. 77. Objet");
+
+    // Simulate data saved before the parser fix, with enough content to scroll.
+    article.text = oldTitle;
+    article.content = "<div><b>" + oldTitle + "</b></div><div>Deuxième paragraphe.</div>";
+    const earlierArticles = Array.from({length: 80}, (_, i) => ({id: "test" + i, type: "article", level: "article", text: "Art. " + (i + 1) + ".", content: "<div style='height:80px'>Art. " + (i + 1) + ". Texte.</div>"}));
+    ctx.act.content.unshift({id: "earlier", type: "chapitre", level: "level1", text: "CHAPITRE I.", content: "CHAPITRE I.", children: earlierArticles});
+    ctx.act.content.push({id: "special", type: "article", level: "article", text: "Art. XV.125/5.", content: "Texte"});
+    ctx.buildContent = analyse.buildContent;
+    await BJ.displayModule(ctx).displayContent(false);
+    await nextFrame(); await nextFrame();
+    check("Cached title and body are repaired", article.text === "Art. 1494." && article.content.includes("</b> " + paragraph));
+    check("Saved highlights follow the repaired title", Boolean(document.getElementById("saved-quote")) && savedQuotes["Art. 1494."]?.length === 1 && !savedQuotes[oldTitle]);
+    check("Saved bookmarks follow the repaired title", savedQuotes.bookmarks["Art. 1494."] && document.getElementById("anchor_" + article.id).classList.contains("bookmark"));
+    check("Brand links to GitHub", document.querySelector(".act-header__brand").href === "https://github.com/rafjaf/BetterJustel");
+    const annotation = document.createElement("annotation");
+    annotation.innerHTML = '<a href="https://example.org">Link</a>';
+    document.getElementById("content").appendChild(annotation);
+    const style = getComputedStyle(annotation.firstChild);
+    check("Annotation links are blue and underlined", style.color === "rgb(0, 0, 255)" && style.textDecorationLine.includes("underline"));
+
+    const tree = $("#jstree").jstree(true);
+    tree.open_all();
+    const toc = document.getElementById("toc");
+    toc.scrollTop = 900;
+    await nextFrame();
+    check("TOC controls stay visible while scrolling", toc.scrollTop > 0 && Math.abs(document.getElementById("btndiv").getBoundingClientRect().top - toc.getBoundingClientRect().top) < 1);
+    const status = document.getElementById("act-load-status");
+    check("Act loading status is a blue caption in the upper pane", status.closest("#info") && status.classList.contains("act-header__caption") && getComputedStyle(status).color === "rgb(0, 0, 255)");
+    check("Toolbar has seven labelled icons with tooltips", Array.from(document.querySelectorAll("#btndiv button")).every(b => b.title && b.getAttribute("aria-label") && b.querySelector("svg")) && document.querySelectorAll("#btndiv button").length === 7);
+    tree.close_all();
+    const dialog = document.getElementById("article-jump-dialog");
+    const input = document.getElementById("article-number");
+    check("Article input is absent from the TOC and hidden until Jump", !toc.querySelector("input") && !dialog.open);
+    document.getElementById("btnJump").click();
+    check("Jump opens a modal HTML dialog and focuses the article input", dialog.open && dialog.matches(":modal") && document.activeElement === input);
+    input.value = "Art. 1494.";
+    input.dispatchEvent(new Event("input"));
+    document.getElementById("article-jump").requestSubmit();
+    await nextFrame();
+    const anchor = document.getElementById(article.id + "_anchor").getBoundingClientRect();
+    check("Jump closes the dialog, opens collapsed sections and selects the article", !dialog.open && tree.get_selected()[0] === article.id && anchor.height > 0);
+    check("Jump positions both panes", anchor.top >= document.getElementById("btndiv").getBoundingClientRect().bottom && anchor.bottom <= toc.getBoundingClientRect().bottom && document.getElementById("content").scrollTop > 0);
+    document.getElementById("btnJump").click();
+    input.value = "XV.125/5";
+    document.getElementById("article-jump").requestSubmit();
+    await nextFrame();
+    check("Jump supports compound article numbers", tree.get_selected()[0] === "special");
+    document.getElementById("btnJump").click();
+    input.value = "999999";
+    document.getElementById("article-jump").requestSubmit();
+    check("Unknown articles keep the dialog open with an inline error", dialog.open && input.getAttribute("aria-invalid") === "true" && document.getElementById("article-jump-error").textContent.includes("not found"));
+    input.dispatchEvent(new Event("input"));
+    check("Editing clears the validation message", !input.hasAttribute("aria-invalid") && !document.getElementById("article-jump-error").textContent);
+    input.value = "";
+    document.getElementById("article-jump").requestSubmit();
+    check("Empty article numbers show an inline error", dialog.open && document.getElementById("article-jump-error").textContent === "Enter an article number.");
+    document.getElementById("article-jump-cancel").click();
+    await nextFrame(); await nextFrame();
+    check("Cancel closes the dialog and returns focus to Jump", !dialog.open && document.activeElement.id === "btnJump");
+
+    const textPane = document.getElementById("content");
+    const autoscroll = document.getElementById("btnAutoscroll");
+    const disabledColor = getComputedStyle(autoscroll).color;
+    const waitForScroll = async () => { await nextFrame(); await nextFrame(); await nextFrame(); };
+    tree.close_all();
+    textPane.scrollTop = 0;
+    await waitForScroll();
+    const priorSelection = tree.get_selected()[0];
+    document.getElementById("anchor_test40").scrollIntoView(true);
+    textPane.scrollTop += 25;
+    await waitForScroll();
+    check("Disabled autoscroll leaves the TOC selection alone", autoscroll.getAttribute("aria-pressed") === "false" && tree.get_selected()[0] === priorSelection);
+    const textPosition = textPane.scrollTop;
+    autoscroll.click();
+    await waitForScroll();
+    const followed = document.getElementById("test40_anchor").getBoundingClientRect();
+    check("Enabling autoscroll changes color and follows text through collapsed sections", autoscroll.getAttribute("aria-pressed") === "true" && getComputedStyle(autoscroll).color !== disabledColor && tree.get_selected()[0] === "test40" && followed.top >= document.getElementById("btndiv").getBoundingClientRect().bottom && followed.bottom <= toc.getBoundingClientRect().bottom);
+    check("Following text does not scroll the text pane", textPane.scrollTop === textPosition);
+    check("Autoscroll is saved as a global setting", settings.tocAutoscroll === true && !Object.keys(settings).some(key => key.startsWith("tocAutoscroll") && key !== "tocAutoscroll"));
+    toc.scrollTop = 0;
+    await waitForScroll();
+    check("Scrolling the TOC does not scroll the text", textPane.scrollTop === textPosition);
+    document.getElementById("anchor_test60").scrollIntoView(true);
+    await waitForScroll();
+    check("Scrolling text updates the TOC selection", tree.get_selected()[0] === "test60");
+    const priorFocus = document.activeElement;
+    let continuousScroll = true;
+    for (let i = 0; i < 12; i++) {
+      const nextPosition = textPane.scrollTop + 13;
+      textPane.scrollTop = nextPosition;
+      await waitForScroll();
+      if (textPane.scrollTop !== nextPosition) { continuousScroll = false; }
+    }
+    check("Small consecutive scroll increments are never reset by autoscroll", continuousScroll);
+    check("Autoscroll never moves keyboard focus", document.activeElement === priorFocus);
+    const followedSelection = tree.get_selected()[0];
+    autoscroll.click();
+    document.getElementById("anchor_test20").scrollIntoView(true);
+    await waitForScroll();
+    check("Disabling autoscroll stops following and restores its color", autoscroll.getAttribute("aria-pressed") === "false" && getComputedStyle(autoscroll).color === disabledColor && tree.get_selected()[0] === followedSelection);
+
+    const sample = document.createElement("p");
+    sample.innerHTML = "l'article d'été <b>œuvre'</b> 'citation' 123' déjà’ <b>l</b>'autre";
+    document.getElementById("content").appendChild(sample);
+    const range = document.createRange(); range.selectNodeContents(sample);
+    const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+    const data = new DataTransfer();
+    const event = new ClipboardEvent("copy", {bubbles: true, cancelable: true, clipboardData: data});
+    sample.dispatchEvent(event);
+    check("Copy corrects apostrophes after Unicode letters", data.getData("text/plain") === "l’article d’été œuvre’ 'citation’ 123' déjà’ l’autre");
+    check("Copy preserves formatting and handles split text nodes", data.getData("text/html").includes("<b>l</b>’autre") && data.getData("text/html").includes("<b>œuvre’</b>"));
+    selection.removeAllRanges(); sample.remove();
+    const copySample = document.createElement("section");
+    copySample.innerHTML = '<div><b>Art. 2.</b> First paragraph.</div><div><span class="subpar">Al. 2</span>Second paragraph.</div><div><span class="subpar">Al. 3</span>The text itself mentions Al. 2.</div>';
+    textPane.appendChild(copySample);
+    function copyRange(range) {
+      selection.removeAllRanges(); selection.addRange(range);
+      const data = new DataTransfer();
+      copySample.dispatchEvent(new ClipboardEvent("copy", {bubbles: true, cancelable: true, clipboardData: data}));
+      return data;
+    }
+    range.selectNodeContents(copySample);
+    const copied = copyRange(range);
+    check("Copy removes generated paragraph labels from both clipboard formats without needing apostrophe correction", !copied.getData("text/plain").includes("Al. 3") && !copied.getData("text/html").includes('class="subpar"') && copied.getData("text/plain").includes("Second paragraph."));
+    check("Copy preserves paragraph breaks, bold text and literal references to Al. 2", copied.getData("text/plain").includes("First paragraph.\nSecond paragraph.") && copied.getData("text/plain").includes("mentions Al. 2.") && copied.getData("text/html").includes("<b>Art. 2.</b>"));
+    const labelText = copySample.querySelector(".subpar").firstChild;
+    range.setStart(labelText, 2); range.setEnd(copySample.children[1].lastChild, 6);
+    const partial = copyRange(range);
+    check("Selections starting midway through a label omit its selected suffix", partial.getData("text/plain") === "Second" && !partial.getData("text/html").includes("Al."));
+    range.setStart(labelText, 0); range.setEnd(labelText, labelText.length);
+    const labelOnly = copyRange(range);
+    check("Selecting only a paragraph label copies no label text", labelOnly.getData("text/plain") === "" && labelOnly.getData("text/html") === "");
+    selection.removeAllRanges(); copySample.remove();
+    document.getElementById("btnAutoscroll").click();
+    ctx.act.eli = "https://www.ejustice.just.fgov.be/eli/loi/1980/08/08/1980080801/justel";
+    await BJ.displayModule(ctx).displayContent(true);
+    await waitForScroll();
+    check("Autoscroll is restored when another act is displayed", document.getElementById("btnAutoscroll").getAttribute("aria-pressed") === "true");
+    check("Loaded act has a red caption in the upper pane", document.getElementById("act-load-status").closest("#info") && getComputedStyle(document.getElementById("act-load-status")).color === "rgb(255, 0, 0)");
+    document.getElementById("btnAutoscroll").click();
+    await BJ.displayModule(ctx).displayContent(false);
+    await waitForScroll();
+    check("Disabled autoscroll is also remembered", settings.tocAutoscroll === false && document.getElementById("btnAutoscroll").getAttribute("aria-pressed") === "false");
+    window.regressionDone = true;
+    console.log(JSON.stringify(checks));
+  } catch (error) {
+    window.regressionError = error.stack;
+    console.error(error);
+  }
+})();
+</script>
+</body>
+</html>
