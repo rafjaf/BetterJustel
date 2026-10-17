@@ -616,7 +616,6 @@ window.BJ.displayModule = function(ctx) {
 				ctx.updateBookmarks();
 				navigationReady = true;
 				updateNavigationButtons();
-				if (visitIndex >= 0) { navigateToArticle(articlesByKey.get(visits[visitIndex]).id, false); }
 				// Load and display case law after content and highlights are ready
 				await ctx.loadAndDisplayCaseLaw();
 			})
